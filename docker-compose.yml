@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+
+  db:
+    image: mysql:8
+    container_name: pmt-mysql
+    restart: always
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_DATABASE=pmt
+      - CHARACTER_SET_SERVER=utf8mb4
+      - COLLATION_SERVER=utf8mb4_general_ci
+      - TZ=Europe/Paris
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./db-init/schema_pmt.sql:/docker-entrypoint-initdb.d/schema_pmt.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: pmt-phpmyadmin
+    restart: always
+    depends_on:
+      - db
+    ports:
+      - "8000:80"
+    environment:
+      - PMA_HOST=db
+      - PMA_PORT=3306
+      - PMA_USER=root
+      - PMA_PASSWORD=root
+
+  backend:
+    build:
+      context: ./pmt-backend
+      dockerfile: Dockerfile
+    container_name: pmt-backend
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/pmt?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
+    ports:
+      - "8080:8080"
+
+#  frontend:
+#    build:
+#      context: ./pmt-frontend
+#      dockerfile: Dockerfile
+#    container_name: pmt-frontend
+#    depends_on:
+#      - backend
+#    ports:
+#      - "4200:80"
+
+volumes:
+  db_data:
