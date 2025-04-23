@@ -52,15 +52,15 @@ services:
     ports:
       - "8080:8080"
 
-#  frontend:
-#    build:
-#      context: ./pmt-frontend
-#      dockerfile: Dockerfile
-#    container_name: pmt-frontend
-#    depends_on:
-#      - backend
-#    ports:
-#      - "4200:80"
+  frontend:
+    build:
+      context: ./pmt-frontend
+      dockerfile: Dockerfile
+    container_name: pmt-frontend
+    depends_on:
+      - backend
+    ports:
+      - "4200:80"
 
 volumes:
   db_data:
