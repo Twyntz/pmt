@@ -10,7 +10,8 @@ RUN npm run build --configuration=production
 # Étape 2 : serve avec Nginx
 FROM nginx:alpine
 
-COPY --from=build /app/dist/pmt-frontend /usr/share/nginx/html
+# 💡 On copie le bon dossier de build
+COPY --from=build /app/dist/pmt-frontend/browser /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
