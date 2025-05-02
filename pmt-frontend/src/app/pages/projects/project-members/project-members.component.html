@@ -1,0 +1,31 @@
+<h2>Membres du projet</h2>
+
+<table>
+  <thead>
+  <tr>
+    <th>Nom</th>
+    <th>Email</th>
+    <th>Rôle</th>
+  </tr>
+  </thead>
+  <tbody>
+  <tr *ngFor="let member of members">
+    <td>{{ member.username }}</td>
+    <td>{{ member.email }}</td>
+    <td>{{ member.role }}</td>
+  </tr>
+  </tbody>
+</table>
+
+<hr>
+
+<h3>Ajouter un membre</h3>
+<form (ngSubmit)="addMember()">
+  <input type="email" [(ngModel)]="newMemberEmail" name="email" placeholder="Email du membre" required />
+  <select [(ngModel)]="newMemberRole" name="role">
+    <option value="ADMIN">Admin</option>
+    <option value="MEMBER">Membre</option>
+    <option value="OBSERVER">Observateur</option>
+  </select>
+  <button type="submit">Ajouter</button>
+</form>

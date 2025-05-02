@@ -1,0 +1,20 @@
+<h2>Créer un nouveau projet</h2>
+
+<form (ngSubmit)="createProject()">
+  <div>
+    <label for="name">Nom du projet</label>
+    <input type="text" id="name" [(ngModel)]="name" name="name" required />
+  </div>
+
+  <div>
+    <label for="description">Description</label>
+    <textarea id="description" [(ngModel)]="description" name="description"></textarea>
+  </div>
+
+  <div>
+    <label for="startDate">Date de début</label>
+    <input type="date" id="startDate" [(ngModel)]="startDate" name="startDate" required />
+  </div>
+
+  <button type="submit">Créer</button>
+</form>

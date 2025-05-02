@@ -1,0 +1,22 @@
+<h2>Liste des projets</h2>
+
+<table>
+  <thead>
+  <tr>
+    <th>Nom</th>
+    <th>Description</th>
+    <th>Propriétaire</th>
+    <th>Actions</th>
+  </tr>
+  </thead>
+  <tbody>
+  <tr *ngFor="let project of projects; index as i">
+    <td>{{ project.name }}</td>
+    <td>{{ project.description }}</td>
+    <td>{{ project.owner }}</td>
+    <td>
+      <a [routerLink]="['/projects', i]">Voir détails</a>
+    </td>
+  </tr>
+  </tbody>
+</table>
