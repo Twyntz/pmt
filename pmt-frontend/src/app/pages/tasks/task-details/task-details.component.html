@@ -1,0 +1,11 @@
+<h2>Détails de la tâche</h2>
+
+<div class="task-details">
+  <p><strong>Titre :</strong> {{ task.title }}</p>
+  <p><strong>Description :</strong> {{ task.description }}</p>
+  <p><strong>Statut :</strong> {{ task.status }}</p>
+  <p><strong>Priorité :</strong> {{ task.priority }}</p>
+  <p><strong>Date limite :</strong> {{ task.deadline }}</p>
+  <p><strong>Date de fin :</strong> {{ task.endDate || 'Non définie' }}</p>
+  <p><strong>Assignée à :</strong> {{ task.assignee }}</p>
+</div>

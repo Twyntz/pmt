@@ -1,0 +1,18 @@
+<h2>Historique de la tâche</h2>
+
+<table>
+  <thead>
+  <tr>
+    <th>Modifié par</th>
+    <th>Modification</th>
+    <th>Date</th>
+  </tr>
+  </thead>
+  <tbody>
+  <tr *ngFor="let entry of history">
+    <td>{{ entry.changedBy }}</td>
+    <td>{{ entry.changeLog }}</td>
+    <td>{{ entry.changedAt | date: 'short' }}</td>
+  </tr>
+  </tbody>
+</table>

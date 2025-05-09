@@ -1,0 +1,8 @@
+<h2>Notifications</h2>
+
+<ul>
+  <li *ngFor="let notif of notifications" [class.read]="notif.isRead">
+    <p>{{ notif.message }}</p>
+    <small>{{ notif.createdAt | date: 'short' }}</small>
+  </li>
+</ul>
