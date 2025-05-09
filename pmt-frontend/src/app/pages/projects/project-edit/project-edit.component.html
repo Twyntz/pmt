@@ -1,1 +1,14 @@
-<p>project-edit works!</p>
+<h2>Modifier le projet</h2>
+
+<form [formGroup]="projectForm" (ngSubmit)="onSubmit()">
+  <label for="name">Nom</label>
+  <input id="name" formControlName="name" type="text" />
+
+  <label for="description">Description</label>
+  <textarea id="description" formControlName="description"></textarea>
+
+  <label for="startDate">Date de début</label>
+  <input id="startDate" formControlName="startDate" type="date" />
+
+  <button type="submit">Mettre à jour</button>
+</form>

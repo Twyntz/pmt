@@ -19,4 +19,5 @@ export const routes: Routes = [
   { path: 'projects/:id/tasks', component: ProjectTasksComponent }
   { path: 'projects/:id/members', component: ProjectMembersComponent },
   { path: 'projects/create', component: ProjectCreateComponent },
+  { path: 'projects/:id/edit', component: ProjectEditComponent },
 ];
