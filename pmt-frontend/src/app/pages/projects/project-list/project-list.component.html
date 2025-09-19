@@ -1,22 +1,43 @@
-<h2>Liste des projets</h2>
+<div class="p-4">
+  <h1 class="text-2xl font-semibold mb-4">Projets</h1>
 
-<table>
-  <thead>
-  <tr>
-    <th>Nom</th>
-    <th>Description</th>
-    <th>Propriétaire</th>
-    <th>Actions</th>
-  </tr>
-  </thead>
-  <tbody>
-  <tr *ngFor="let project of projects; index as i">
-    <td>{{ project.name }}</td>
-    <td>{{ project.description }}</td>
-    <td>{{ project.owner }}</td>
-    <td>
-      <a [routerLink]="['/projects', i]">Voir détails</a>
-    </td>
-  </tr>
-  </tbody>
-</table>
+  <div *ngIf="loading" class="text-sm italic">Chargement…</div>
+
+  <div *ngIf="error && !loading" class="text-red-600 border border-red-200 bg-red-50 rounded p-3 mb-4">
+    {{ error }}
+  </div>
+
+  <div *ngIf="!loading && !error && projects.length === 0" class="text-gray-600">
+    Aucun projet trouvé.
+  </div>
+
+  <div *ngIf="!loading && !error && projects.length > 0" class="overflow-x-auto">
+    <table class="min-w-full border border-gray-200 rounded-lg">
+      <thead class="bg-gray-50">
+        <tr>
+          <th class="text-left p-3 border-b">ID</th>
+          <th class="text-left p-3 border-b">Nom</th>
+          <th class="text-left p-3 border-b">Description</th>
+          <th class="text-left p-3 border-b">Début</th>
+          <th class="text-left p-3 border-b">Owner</th>
+          <th class="text-left p-3 border-b">Créé le</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let p of projects" class="hover:bg-gray-50">
+          <td class="p-3 border-b font-mono text-xs">{{ val(p,'id') }}</td>
+          <td class="p-3 border-b">{{ val(p,'name','nom') }}</td>
+          <td class="p-3 border-b">{{ val(p,'description','desc') }}</td>
+          <td class="p-3 border-b">{{ fmtDate(val(p,'startDate','start_date')) }}</td>
+
+          <!-- owner peut être une string (ownerId) OU un objet (owner.id / owner.email / owner.name) -->
+          <td class="p-3 border-b font-mono text-xs">
+            {{ val(p,'ownerId','owner_id') || nested(p,'owner.id') || nested(p,'owner.email') || nested(p,'owner.name') }}
+          </td>
+
+          <td class="p-3 border-b">{{ fmtDate(val(p,'createdAt','created_at')) }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

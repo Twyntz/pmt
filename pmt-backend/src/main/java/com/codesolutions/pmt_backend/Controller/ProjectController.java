@@ -1,5 +1,6 @@
 package com.codesolutions.pmt_backend.Controller;
 
+import com.codesolutions.pmt_backend.DTO.ProjectDTO;
 import com.codesolutions.pmt_backend.Entity.Project;
 import com.codesolutions.pmt_backend.Service.ProjectService;
 import org.springframework.web.bind.annotation.*;
@@ -8,7 +9,8 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/projects")
+@RequestMapping({"/api/projects", "/projects"})
+@CrossOrigin(origins = {"http://localhost:4200"})
 public class ProjectController {
 
     private final ProjectService projectService;
@@ -17,18 +19,21 @@ public class ProjectController {
         this.projectService = projectService;
     }
 
+    // ----- Lecture en DTO (plat) -----
     @GetMapping
-    public List<Project> getAllProjects() {
-        return projectService.getAllProjects();
-    }
-
-    @PostMapping
-    public Project createProject(@RequestBody Project project) {
-        return projectService.createProject(project);
+    public List<ProjectDTO> getAllProjects() {
+        return projectService.getAllProjectsDto();
     }
 
     @GetMapping("/{id}")
-    public Project getProjectById(@PathVariable UUID id) {
-        return projectService.getProjectById(id);
+    public ProjectDTO getProjectById(@PathVariable UUID id) {
+        return projectService.getProjectDtoById(id);
+    }
+
+    // ----- Création via entité puis renvoi DTO -----
+    @PostMapping
+    public ProjectDTO createProject(@RequestBody Project project) {
+        Project saved = projectService.createProject(project);
+        return projectService.getProjectDtoById(saved.getId());
     }
 }
