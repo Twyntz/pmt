@@ -1,7 +1,50 @@
-<h1>Inscription</h1>
-<form [formGroup]="registerForm" (ngSubmit)="onSubmit()">
-  <input type="text" placeholder="Nom d'utilisateur" formControlName="username" />
-  <input type="email" placeholder="Email" formControlName="email" />
-  <input type="password" placeholder="Mot de passe" formControlName="password" />
-  <button type="submit">S'inscrire</button>
-</form>
+<div class="max-w-md mx-auto p-6 border rounded">
+  <h1 class="text-2xl font-semibold mb-4">Inscription</h1>
+
+  <form [formGroup]="form" (ngSubmit)="submit()" class="space-y-4">
+    <div>
+      <label class="block text-sm font-medium mb-1">Nom d'utilisateur</label>
+      <input class="w-full border rounded p-2" type="text" formControlName="username" placeholder="alice" />
+      <div class="text-red-600 text-sm mt-1" *ngIf="username.touched && username.invalid">
+        Doit contenir au moins 3 caractères.
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium mb-1">Email</label>
+      <input class="w-full border rounded p-2" type="email" formControlName="email" placeholder="alice@example.com" />
+      <div class="text-red-600 text-sm mt-1" *ngIf="email.touched && email.invalid">
+        Email requis et valide.
+      </div>
+    </div>
+
+    <div formGroupName="groupPwd">
+      <label class="block text-sm font-medium mb-1">Mot de passe</label>
+      <input class="w-full border rounded p-2" type="password" formControlName="password" placeholder="•••••••" />
+      <div class="text-red-600 text-sm mt-1" *ngIf="passwordCtrl?.touched && passwordCtrl?.invalid">
+        Minimum 6 caractères.
+      </div>
+
+      <label class="block text-sm font-medium mb-1 mt-3">Confirmer le mot de passe</label>
+      <input class="w-full border rounded p-2" type="password" formControlName="confirm" placeholder="•••••••" />
+      <!-- ⬇️ utiliser ['mismatch'] -->
+      <div class="text-red-600 text-sm mt-1" *ngIf="groupPwd?.touched && groupPwd?.errors?.['mismatch']">
+        Les mots de passe ne correspondent pas.
+      </div>
+    </div>
+
+    <button class="px-4 py-2 rounded bg-black text-white disabled:opacity-50"
+            [disabled]="loading || form.invalid">
+      {{ loading ? 'Création…' : "S'inscrire" }}
+    </button>
+
+    <div *ngIf="error" class="text-red-700 bg-red-50 border border-red-200 rounded p-2 mt-2">
+      {{ error }}
+    </div>
+  </form>
+
+  <p class="text-sm text-gray-600 mt-4">
+    Déjà un compte ?
+    <a routerLink="/login" class="underline">Se connecter</a>
+  </p>
+</div>

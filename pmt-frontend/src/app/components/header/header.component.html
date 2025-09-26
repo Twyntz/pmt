@@ -1,16 +1,20 @@
-<header>
-  <nav class="navbar">
-    <ul class="flex gap-4 p-4 bg-gray-800 text-white">
-      <li><a routerLink="/dashboard" routerLinkActive="active">Dashboard</a></li>
-      <li><a routerLink="/projects" routerLinkActive="active">Projets</a></li>
-      <!-- <li><a routerLink="/projects/create" routerLinkActive="active">Créer un projet</a></li>
-      <li><a routerLink="/tasks" routerLinkActive="active">Tâches</a></li>
-      <li><a routerLink="/notifications" routerLinkActive="active">Notifications</a></li>
-      <li><a routerLink="/history" routerLinkActive="active">Historique</a></li>
-      <li class="auth-link"><a routerLink="/login" routerLinkActive="active">Connexion</a></li>
-      <li class="auth-link"><a routerLink="/register" routerLinkActive="active">Inscription</a></li>
-    -->
-    </ul> 
-  </nav>
+<header class="bg-gray-800 text-white">
+  <nav class="max-w-6xl mx-auto">
+    <ul class="flex items-center gap-4 p-4">
+      <li><a routerLink="/dashboard" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" class="hover:underline">Dashboard</a></li>
+      <li><a routerLink="/projects" routerLinkActive="active" class="hover:underline">Projets</a></li>
 
+      <li class="ml-auto"></li>
+
+      <ng-container *ngIf="auth.isLoggedIn(); else authLinks">
+        <li class="text-sm text-gray-200">Connecté : <span class="font-semibold">{{ auth.getCurrentUser()?.username }}</span></li>
+        <li><button class="px-3 py-1 rounded border border-white/30 hover:bg-white/10 transition" (click)="logout()">Déconnexion</button></li>
+      </ng-container>
+
+      <ng-template #authLinks>
+        <li><a routerLink="/login" routerLinkActive="active" class="px-3 py-1 rounded border border-white/30 hover:bg-white/10 transition">Connexion</a></li>
+        <li><a routerLink="/register" routerLinkActive="active" class="px-3 py-1 rounded border border-white/30 hover:bg-white/10 transition">Inscription</a></li>
+      </ng-template>
+    </ul>
+  </nav>
 </header>
