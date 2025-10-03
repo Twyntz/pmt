@@ -4,6 +4,7 @@ import { RegisterComponent } from './pages/register/register.component';
 import { authGuard } from './guards/auth.guard';
 import { Component } from '@angular/core';
 import { ProjectListComponent } from './pages/projects/project-list/project-list.component';
+import { ProjectCreateComponent } from './pages/projects/project-create/project-create.component';
 
 @Component({
   selector: 'app-dashboard',
@@ -18,5 +19,6 @@ export const routes: Routes = [
   { path: 'register', component: RegisterComponent },
   { path: 'dashboard', component: DashboardComponent, canActivate: [authGuard] },
   { path: 'projects', component: ProjectListComponent, canActivate: [authGuard] },
+  { path: 'projects/create', component: ProjectCreateComponent, canActivate: [authGuard] },
   { path: '**', redirectTo: 'dashboard' }
 ];

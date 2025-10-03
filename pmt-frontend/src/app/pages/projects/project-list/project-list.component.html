@@ -1,43 +1,39 @@
-<div class="p-4">
+<div class="max-w-6xl mx-auto">
   <h1 class="text-2xl font-semibold mb-4">Projets</h1>
 
-  <div *ngIf="loading" class="text-sm italic">Chargement…</div>
+  <div *ngIf="loading" class="mb-3 text-gray-600">Chargement…</div>
+  <div *ngIf="error" class="mb-3 text-red-700 bg-red-50 border border-red-200 p-2 rounded">{{ error }}</div>
 
-  <div *ngIf="error && !loading" class="text-red-600 border border-red-200 bg-red-50 rounded p-3 mb-4">
-    {{ error }}
-  </div>
+  <table class="w-full border-collapse border" *ngIf="!loading && projects.length">
+    <thead class="bg-gray-100">
+      <tr>
+        <th class="border p-2 text-left">ID</th>
+        <th class="border p-2 text-left">Nom</th>
+        <th class="border p-2 text-left">Description</th>
+        <th class="border p-2 text-left">Début</th>
+        <th class="border p-2 text-left">Owner</th>
+        <th class="border p-2 text-left">Créé le</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let p of projects; trackBy: trackById">
+        <td class="border p-2">{{ p.id }}</td>
+        <td class="border p-2">{{ p.name }}</td>
+        <td class="border p-2">{{ p.description }}</td>
+        <td class="border p-2">
+          <!-- p.startDate peut arriver en 'YYYY-MM-DD' : on l'affiche tel quel -->
+          {{ p.startDate || '' }}
+        </td>
+        <td class="border p-2">{{ p.ownerId }}</td>
+        <td class="border p-2">
+          <!-- p.createdAt peut être ISO ou localDateTime : on tronque proprement -->
+          {{ (p.createdAt || '').toString().replace('T', ' ').slice(0, 19) }}
+        </td>
+      </tr>
+    </tbody>
+  </table>
 
-  <div *ngIf="!loading && !error && projects.length === 0" class="text-gray-600">
-    Aucun projet trouvé.
-  </div>
-
-  <div *ngIf="!loading && !error && projects.length > 0" class="overflow-x-auto">
-    <table class="min-w-full border border-gray-200 rounded-lg">
-      <thead class="bg-gray-50">
-        <tr>
-          <th class="text-left p-3 border-b">ID</th>
-          <th class="text-left p-3 border-b">Nom</th>
-          <th class="text-left p-3 border-b">Description</th>
-          <th class="text-left p-3 border-b">Début</th>
-          <th class="text-left p-3 border-b">Owner</th>
-          <th class="text-left p-3 border-b">Créé le</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr *ngFor="let p of projects" class="hover:bg-gray-50">
-          <td class="p-3 border-b font-mono text-xs">{{ val(p,'id') }}</td>
-          <td class="p-3 border-b">{{ val(p,'name','nom') }}</td>
-          <td class="p-3 border-b">{{ val(p,'description','desc') }}</td>
-          <td class="p-3 border-b">{{ fmtDate(val(p,'startDate','start_date')) }}</td>
-
-          <!-- owner peut être une string (ownerId) OU un objet (owner.id / owner.email / owner.name) -->
-          <td class="p-3 border-b font-mono text-xs">
-            {{ val(p,'ownerId','owner_id') || nested(p,'owner.id') || nested(p,'owner.email') || nested(p,'owner.name') }}
-          </td>
-
-          <td class="p-3 border-b">{{ fmtDate(val(p,'createdAt','created_at')) }}</td>
-        </tr>
-      </tbody>
-    </table>
+  <div *ngIf="!loading && !projects.length" class="text-gray-600">
+    Aucun projet pour le moment.
   </div>
 </div>

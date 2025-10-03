@@ -1,20 +1,39 @@
-<h2>Créer un nouveau projet</h2>
+<div class="max-w-xl mx-auto p-6 border rounded">
+  <h1 class="text-2xl font-semibold mb-4">Nouveau projet</h1>
 
-<form (ngSubmit)="createProject()">
-  <div>
-    <label for="name">Nom du projet</label>
-    <input type="text" id="name" [(ngModel)]="name" name="name" required />
-  </div>
+  <!-- ngSubmit + fallback (click) pour s'assurer que ça part -->
+  <form [formGroup]="form" (ngSubmit)="submit()" class="space-y-4">
+    <div>
+      <label class="block text-sm font-medium mb-1">Nom du projet</label>
+      <input class="w-full border rounded p-2" type="text" formControlName="name" placeholder="PMT Project" />
+      <div class="text-red-600 text-sm mt-1" *ngIf="name.touched && name.invalid">
+        Nom requis (min 3 caractères).
+      </div>
+    </div>
 
-  <div>
-    <label for="description">Description</label>
-    <textarea id="description" [(ngModel)]="description" name="description"></textarea>
-  </div>
+    <div>
+      <label class="block text-sm font-medium mb-1">Description</label>
+      <textarea class="w-full border rounded p-2" rows="3" formControlName="description"
+                placeholder="Description rapide du projet"></textarea>
+    </div>
 
-  <div>
-    <label for="startDate">Date de début</label>
-    <input type="date" id="startDate" [(ngModel)]="startDate" name="startDate" required />
-  </div>
+    <div>
+      <label class="block text-sm font-medium mb-1">Date de début</label>
+      <input class="w-full border rounded p-2" type="date" formControlName="startDate" />
+      <p class="text-xs text-gray-500 mt-1">Optionnelle</p>
+    </div>
 
-  <button type="submit">Créer</button>
-</form>
+    <button
+      type="submit"
+      class="px-4 py-2 rounded bg-black text-white disabled:opacity-50"
+      [disabled]="loading || form.invalid"
+      (click)="submit()"
+    >
+      {{ loading ? 'Création…' : 'Créer le projet' }}
+    </button>
+
+    <div *ngIf="error" class="text-red-700 bg-red-50 border border-red-200 rounded p-2 mt-2">
+      {{ error }}
+    </div>
+  </form>
+</div>

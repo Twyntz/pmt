@@ -1,8 +1,7 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { HttpClientModule } from '@angular/common/http';
-import { Subject, takeUntil } from 'rxjs';
 import { ProjectService } from '../../../services/project.service';
 
 @Component({
@@ -12,49 +11,33 @@ import { ProjectService } from '../../../services/project.service';
   templateUrl: './project-list.component.html',
   styleUrl: './project-list.component.scss'
 })
-export class ProjectListComponent implements OnInit, OnDestroy {
+export class ProjectListComponent implements OnInit {
   projects: any[] = [];
   loading = false;
   error: string | null = null;
 
-  private destroy$ = new Subject<void>();
-
-  constructor(private projectService: ProjectService) {}
+  constructor(private projectsSvc: ProjectService) {}
 
   ngOnInit(): void {
-    this.fetchProjects();
+    this.fetch();
   }
 
-  ngOnDestroy(): void {
-    this.destroy$.next();
-    this.destroy$.complete();
-  }
-
-  private fetchProjects(): void {
+  fetch(): void {
     this.loading = true;
     this.error = null;
-
-    this.projectService.getAll()
-      .pipe(takeUntil(this.destroy$))
-      .subscribe({
-        next: (data: any[]) => {
-          this.projects = Array.isArray(data) ? data : [];
-          this.loading = false;
-        },
-        error: (err) => {
-          console.error('Erreur API projets :', err);
-          this.error = 'Impossible de récupérer les projets sur http://localhost:8080.';
-          this.loading = false;
-        }
-      });
+    this.projectsSvc.getAll().subscribe({
+      next: (list) => {
+        this.loading = false;
+        this.projects = Array.isArray(list) ? list : [];
+      },
+      error: (e) => {
+        this.loading = false;
+        const msg = e?.error?.error || e?.message || 'Erreur inconnue';
+        this.error = 'Impossible de charger les projets : ' + msg;
+        this.projects = [];
+      }
+    });
   }
 
-  // helpers d’affichage : gère camel/snake et nesting (ex: owner.id)
-  val(o: any, a: string, b?: string) { return o?.[a] ?? (b ? o?.[b] : undefined); }
-  nested(o: any, path: string) { return path.split('.').reduce((acc, k) => acc?.[k], o); }
-  fmtDate(v: any) {
-    if (!v) return '—';
-    const d = new Date(v);
-    return isNaN(+d) ? String(v) : d.toLocaleDateString();
-  }
+  trackById = (_: number, p: any) => p?.id ?? p?._id ?? _;
 }

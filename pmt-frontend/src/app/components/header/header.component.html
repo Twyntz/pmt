@@ -3,6 +3,12 @@
     <ul class="flex items-center gap-4 p-4">
       <li><a routerLink="/dashboard" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" class="hover:underline">Dashboard</a></li>
       <li><a routerLink="/projects" routerLinkActive="active" class="hover:underline">Projets</a></li>
+      <ng-container *ngIf="auth.isLoggedIn()">
+        <li>
+          <a routerLink="/projects/create" routerLinkActive="active"
+            class="px-3 py-1 rounded border border-white/30 hover:bg-white/10 transition">Créer un projet</a>
+        </li>
+      </ng-container>
 
       <li class="ml-auto"></li>
 

@@ -1,38 +1,40 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, catchError, of, switchMap } from 'rxjs';
+import { Observable } from 'rxjs';
 
 @Injectable({ providedIn: 'root' })
 export class ProjectService {
-  // API: ton back expose /api/projects (et on garde des alias en fallback)
-  private readonly tries = [
-    'http://localhost:8080/api/projects',
-    'http://localhost:8080/projects',      // alias si tu actives aussi /projects côté back (cf. ci-dessous)
-    'http://localhost:8080/api/v1/projects'
-  ];
+  /**
+   * IMPORTANT
+   * - On utilise des URLS RELATIVES pour bénéficier du proxy Nginx du front.
+   * - Nginx doit proxyfier /api/ vers le backend (tu l’as déjà).
+   */
+  private readonly base = '/api/projects';
 
   constructor(private http: HttpClient) {}
 
+  // ---------- LECTURE ----------
   getAll(): Observable<any[]> {
-    const tryAt = (i: number): Observable<any[]> => {
-      if (i >= this.tries.length) return of([]);
-      const url = this.tries[i];
-      return this.http.get<any[]>(url).pipe(
-        catchError(() => tryAt(i + 1))
-      );
-    };
-    return tryAt(0);
+    return this.http.get<any[]>(this.base);
   }
 
   getById(id: string): Observable<any> {
-    // même logique : on tente les URLs dans l'ordre
-    const tryAt = (i: number): Observable<any> => {
-      if (i >= this.tries.length) return of(null);
-      const url = `${this.tries[i]}/${id}`;
-      return this.http.get<any>(url).pipe(
-        catchError(() => tryAt(i + 1))
-      );
+    return this.http.get<any>(`${this.base}/${id}`);
+  }
+
+  // ---------- CREATION ----------
+  /**
+   * payload attendu par le backend:
+   * { name: string; description?: string; startDate?: 'YYYY-MM-DD'; ownerId: string }
+   */
+  create(payload: { name: string; description?: string; startDate?: string; ownerId: string }): Observable<any> {
+    const body = {
+      name: payload.name ?? '',
+      description: payload.description ?? '',
+      startDate: payload.startDate ?? '',   // <-- clé correcte
+      ownerId: payload.ownerId
     };
-    return tryAt(0);
+    // Pas de fallback multi-origines : on laisse remonter l’erreur backend si 4xx/5xx
+    return this.http.post<any>(this.base, body);
   }
 }
