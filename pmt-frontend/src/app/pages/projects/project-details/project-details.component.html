@@ -1,9 +1,12 @@
 <div class="max-w-6xl mx-auto p-6">
   <a routerLink="/projects" class="text-sm underline text-gray-600">← Retour à la liste</a>
 
-  <!-- Infos projet -->
+  <!-- ===================== INFOS PROJET ===================== -->
   <div class="mt-4 p-4 border rounded">
-    <h1 class="text-2xl font-semibold">Détails du projet</h1>
+    <div class="flex items-center justify-between">
+      <h1 class="text-2xl font-semibold">Détails du projet</h1>
+      <button class="text-sm underline" (click)="loadProject()">Rafraîchir</button>
+    </div>
 
     <div *ngIf="loadingProject" class="mt-2 text-gray-600">Chargement…</div>
     <div *ngIf="errorProject" class="mt-2 text-red-700 bg-red-50 border border-red-200 p-2 rounded">
@@ -13,15 +16,29 @@
     <div *ngIf="project && !loadingProject" class="mt-3 grid gap-2 md:grid-cols-2">
       <div><span class="font-medium">Nom :</span> {{ project.name }}</div>
       <div><span class="font-medium">Début :</span> {{ project.startDate || '—' }}</div>
+
       <div class="md:col-span-2">
         <span class="font-medium">Description :</span> {{ project.description || '—' }}
       </div>
-      <div><span class="font-medium">Owner :</span> {{ project.ownerId }}</div>
-      <div><span class="font-medium">Créé le :</span> {{ (project.createdAt || '').toString().replace('T',' ').slice(0,19) }}</div>
+
+      <div>
+        <span class="font-medium">Owner :</span>
+        <ng-container *ngIf="ownerName; else ownerIdTpl">{{ ownerName }}</ng-container>
+        <ng-template #ownerIdTpl>{{ project.ownerId || project.owner?.id || '—' }}</ng-template>
+      </div>
+
+      <div>
+        <span class="font-medium">Créé le :</span>
+        {{ (project.createdAt || '').toString().replace('T',' ').slice(0,19) }}
+      </div>
+    </div>
+
+    <div *ngIf="ownerError" class="text-red-700 bg-red-50 border border-red-200 p-2 rounded mt-2">
+      {{ ownerError }}
     </div>
   </div>
 
-  <!-- Membres -->
+  <!-- ===================== MEMBRES ===================== -->
   <div class="mt-6 p-4 border rounded">
     <div class="flex items-center justify-between">
       <h2 class="text-xl font-semibold">Membres</h2>
@@ -57,14 +74,72 @@
     </div>
   </div>
 
-  <!-- Invitation (seulement pour le owner) -->
+  <!-- ===================== TÂCHES ===================== -->
+  <div class="mt-6 p-4 border rounded">
+    <div class="flex items-center justify-between">
+      <h2 class="text-xl font-semibold">Tâches</h2>
+      <div class="flex items-center gap-4">
+        <a class="text-sm underline" (click)="loadTasks()">Rafraîchir</a>
+        <a class="px-3 py-1 rounded border hover:bg-gray-50"
+           [routerLink]="['/projects', projectId, 'tasks', 'create']">
+          Créer une tâche
+        </a>
+      </div>
+    </div>
+
+    <div *ngIf="loadingTasks" class="mt-2 text-gray-600">Chargement…</div>
+    <div *ngIf="errorTasks" class="mt-2 text-red-700 bg-red-50 border border-red-200 p-2 rounded">
+      {{ errorTasks }}
+    </div>
+
+    <table *ngIf="!loadingTasks && tasks.length" class="w-full border-collapse border mt-3">
+      <thead class="bg-gray-100">
+        <tr>
+          <th class="border p-2 text-left">Titre</th>
+          <th class="border p-2 text-left">Description</th>
+          <th class="border p-2 text-left">Statut</th>
+          <th class="border p-2 text-left">Priorité</th>
+          <th class="border p-2 text-left">Échéance</th>
+          <th class="border p-2 text-left">Fin</th>
+          <th class="border p-2 text-left">Assigné à</th>
+          <th class="border p-2 text-left">Créée le</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let t of tasks">
+          <td class="border p-2">{{ t.title }}</td>
+          <td class="border p-2">{{ t.description || '—' }}</td>
+          <td class="border p-2">{{ t.status }}</td>
+          <td class="border p-2">
+            <span [class]="
+              t.priority === 'HIGH' ? 'text-red-600' :
+              t.priority === 'LOW' ? 'text-gray-600' : 'text-yellow-700'
+            ">
+              {{ t.priority }}
+            </span>
+          </td>
+          <td class="border p-2">{{ t.deadline || '—' }}</td>
+          <td class="border p-2">{{ t.endDate || '—' }}</td>
+          <td class="border p-2">{{ t.assigneeUsername || t.assigneeEmail || '—' }}</td>
+          <td class="border p-2">{{ (t.createdAt || '').toString().replace('T',' ').slice(0,19) }}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div *ngIf="!loadingTasks && !tasks.length" class="text-gray-600 mt-2">
+      Aucune tâche pour le moment.
+    </div>
+  </div>
+
+  <!-- ===================== INVITATION ===================== -->
   <div class="mt-6 p-4 border rounded" *ngIf="isOwner()">
     <h2 class="text-xl font-semibold mb-3">Inviter un membre</h2>
 
     <form [formGroup]="inviteForm" (ngSubmit)="invite()" class="grid gap-3 md:grid-cols-3">
       <div class="md:col-span-2">
         <label class="block text-sm font-medium mb-1">Email</label>
-        <input type="email" class="w-full border rounded p-2" formControlName="email" placeholder="user@example.com" />
+        <input type="email" class="w-full border rounded p-2"
+               formControlName="email" placeholder="user@example.com" />
       </div>
 
       <div>

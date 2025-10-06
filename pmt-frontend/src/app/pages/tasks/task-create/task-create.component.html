@@ -1,0 +1,70 @@
+<div class="max-w-xl mx-auto p-6 border rounded">
+  <a [routerLink]="['/projects', projectId]" class="text-sm underline text-gray-600">← Retour au projet</a>
+  <h1 class="text-2xl font-semibold mb-4 mt-2">Nouvelle tâche</h1>
+
+  <form [formGroup]="form" (ngSubmit)="submit()" class="space-y-4">
+    <div>
+      <label class="block text-sm font-medium mb-1">Titre</label>
+      <input type="text" class="w-full border rounded p-2" placeholder="Titre de la tâche" formControlName="title" />
+      <div class="text-red-600 text-sm mt-1" *ngIf="titleCtrl.touched && titleCtrl.invalid">
+        Titre requis (min 3 caractères).
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium mb-1">Description</label>
+      <textarea rows="3" class="w-full border rounded p-2" formControlName="description" placeholder="Détails (optionnel)"></textarea>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium mb-1">Statut</label>
+        <select class="w-full border rounded p-2" formControlName="status">
+          <option value="TODO">À faire</option>
+          <option value="IN_PROGRESS">En cours</option>
+          <option value="DONE">Terminé</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-1">Priorité</label>
+        <select class="w-full border rounded p-2" formControlName="priority">
+          <option value="LOW">Basse</option>
+          <option value="MEDIUM">Moyenne</option>
+          <option value="HIGH">Haute</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium mb-1">Échéance</label>
+        <input type="date" class="w-full border rounded p-2" formControlName="deadline" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium mb-1">Date de fin</label>
+        <input type="date" class="w-full border rounded p-2" formControlName="endDate" />
+      </div>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium mb-1">Assigner à</label>
+      <div *ngIf="loadingMembers" class="text-gray-600 text-sm">Chargement des membres…</div>
+      <div *ngIf="loadMembersError" class="text-red-700 bg-red-50 border border-red-200 rounded p-2 mb-2">
+        {{ loadMembersError }}
+      </div>
+      <select class="w-full border rounded p-2" formControlName="assigneeId" [disabled]="loadingMembers || !!loadMembersError">
+        <option value="">— Non assignée —</option>
+        <option *ngFor="let m of members" [value]="m.id">
+          {{ m.username || m.email }} <span *ngIf="m.username && m.email">({{ m.email }})</span>
+        </option>
+      </select>
+    </div>
+
+    <button type="submit" class="px-4 py-2 rounded bg-black text-white disabled:opacity-50"
+            [disabled]="loading || form.invalid">
+      {{ loading ? 'Création…' : 'Créer la tâche' }}
+    </button>
+
+    <div *ngIf="error" class="text-red-700 bg-red-50 border border-red-200 rounded p-2 mt-2">{{ error }}</div>
+  </form>
+</div>

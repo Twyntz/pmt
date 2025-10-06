@@ -3,8 +3,10 @@ import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { Router, RouterModule } from '@angular/router';
 import { HttpClientModule } from '@angular/common/http';
+
+import { ProjectService, CreateProjectPayload } from '../../../services/project.service';
 import { AuthService } from '../../../services/auth.service';
-import { ProjectService } from '../../../services/project.service';
+
 @Component({
   selector: 'app-project-create',
   standalone: true,
@@ -13,14 +15,14 @@ import { ProjectService } from '../../../services/project.service';
   styleUrl: './project-create.component.scss'
 })
 export class ProjectCreateComponent implements OnInit {
+  loading = false;
+  error: string | null = null;
+
   form = this.fb.group({
     name: ['', [Validators.required, Validators.minLength(3)]],
     description: [''],
-    startDate: [''] // yyyy-MM-dd (optionnelle)
+    startDate: [''] // YYYY-MM-DD
   });
-
-  loading = false;
-  error: string | null = null;
 
   constructor(
     private fb: FormBuilder,
@@ -30,50 +32,40 @@ export class ProjectCreateComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    if (!this.auth.isLoggedIn()) this.router.navigateByUrl('/login');
+    if (!this.auth.isLoggedIn()) {
+      this.router.navigateByUrl('/login');
+      return;
+    }
   }
 
   submit(): void {
-    console.log('[ProjectCreate] submit() called, form value =', this.form.value);
+    if (this.form.invalid) { this.form.markAllAsTouched(); return; }
+    this.loading = true; this.error = null;
 
-    if (this.form.invalid) {
-      this.form.markAllAsTouched();
-      this.error = 'Veuillez corriger le formulaire.';
-      return;
-    }
-
-    const user = this.auth.getCurrentUser();
-    if (!user?.id) {
-      this.error = 'Session invalide : identifiant utilisateur manquant.';
-      return;
-    }
-
-    const payload = {
+    const current = this.auth.getCurrentUser();
+    const payload: CreateProjectPayload = {
       name: this.form.controls.name.value ?? '',
       description: this.form.controls.description.value ?? '',
-      startDate: this.form.controls.startDate.value ?? '',  // <-- pas de typo !
-      ownerId: user.id as string
+      startDate: this.form.controls.startDate.value ?? '',
+      ownerId: current?.id // optionnel si le back l'infère
     };
 
-    this.loading = true;
-    this.error = null;
-
-    console.log('[ProjectCreate] POST payload →', payload);
-
     this.projects.create(payload).subscribe({
-      next: (res) => {
-        console.log('[ProjectCreate] success →', res);
+      next: (res: any) => {
         this.loading = false;
-        this.router.navigateByUrl('/projects');
+        const newId: string | undefined = res?.id || res?.projectId || res?.data?.id;
+        this.router.navigateByUrl(newId ? `/projects/${newId}` : '/projects');
       },
-      error: (e) => {
+      error: (e: unknown) => {
         this.loading = false;
-        console.error('[ProjectCreate] error →', e);
-        const msg = e?.error?.error || e?.error?.details || e?.message || 'Erreur inconnue';
+        const err = e as any;
+        const msg = err?.error?.error || err?.error?.details || err?.message || 'Erreur inconnue';
         this.error = 'Impossible de créer le projet : ' + msg;
       }
     });
   }
 
+  // Getters pour le template (on expose les deux pour compatibilité)
+  get nameCtrl() { return this.form.controls.name; }
   get name() { return this.form.controls.name; }
 }
