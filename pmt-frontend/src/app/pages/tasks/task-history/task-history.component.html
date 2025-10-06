@@ -1,18 +1,32 @@
-<h2>Historique de la tâche</h2>
+<div class="max-w-4xl mx-auto p-6 border rounded">
+  <div class="flex items-center justify-between">
+    <button class="text-sm underline" (click)="goBack()">← Retour à la tâche</button>
+    <button class="text-sm underline" (click)="load()">Rafraîchir</button>
+  </div>
 
-<table>
-  <thead>
-  <tr>
-    <th>Modifié par</th>
-    <th>Modification</th>
-    <th>Date</th>
-  </tr>
-  </thead>
-  <tbody>
-  <tr *ngFor="let entry of history">
-    <td>{{ entry.changedBy }}</td>
-    <td>{{ entry.changeLog }}</td>
-    <td>{{ entry.changedAt | date: 'short' }}</td>
-  </tr>
-  </tbody>
-</table>
+  <h1 class="text-2xl font-semibold mt-2">Historique de la tâche</h1>
+
+  <div *ngIf="loading" class="mt-2 text-gray-600">Chargement…</div>
+  <div *ngIf="error" class="mt-2 text-red-700 bg-red-50 border border-red-200 p-2 rounded">{{ error }}</div>
+
+  <table *ngIf="!loading && items.length" class="w-full border-collapse border mt-3">
+    <thead class="bg-gray-100">
+      <tr>
+        <th class="border p-2 text-left">Date</th>
+        <th class="border p-2 text-left">Changement</th>
+        <th class="border p-2 text-left">Par</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let h of items">
+        <td class="border p-2">{{ (h.changedAt || '').toString().replace('T',' ').slice(0,19) }}</td>
+        <td class="border p-2 whitespace-pre-wrap">{{ h.changeLog }}</td>
+        <td class="border p-2">{{ h.changedByUsername || h.changedByEmail || h.changedById || '—' }}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div *ngIf="!loading && !items.length" class="text-gray-600 mt-2">
+    Aucun changement enregistré pour l’instant.
+  </div>
+</div>

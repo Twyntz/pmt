@@ -1,8 +1,10 @@
 package com.codesolutions.pmt_backend.Controller;
 
 import com.codesolutions.pmt_backend.DTO.TaskDTO;
+import com.codesolutions.pmt_backend.DTO.TaskHistoryDTO;
 import com.codesolutions.pmt_backend.Entity.*;
 import com.codesolutions.pmt_backend.Repository.ProjectRepository;
+import com.codesolutions.pmt_backend.Repository.TaskHistoryRepository;
 import com.codesolutions.pmt_backend.Repository.TaskRepository;
 import com.codesolutions.pmt_backend.Repository.UserRepository;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -12,9 +14,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
 import java.time.LocalDate;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 @RestController
 @RequestMapping({"/api/projects/{projectId}/tasks", "/projects/{projectId}/tasks"})
@@ -24,11 +24,16 @@ public class TaskController {
     private final TaskRepository taskRepo;
     private final ProjectRepository projectRepo;
     private final UserRepository userRepo;
+    private final TaskHistoryRepository historyRepo;
 
-    public TaskController(TaskRepository taskRepo, ProjectRepository projectRepo, UserRepository userRepo) {
+    public TaskController(TaskRepository taskRepo,
+                          ProjectRepository projectRepo,
+                          UserRepository userRepo,
+                          TaskHistoryRepository historyRepo) {
         this.taskRepo = taskRepo;
         this.projectRepo = projectRepo;
         this.userRepo = userRepo;
+        this.historyRepo = historyRepo;
     }
 
     public static class TaskRequest {
@@ -40,6 +45,7 @@ public class TaskController {
         public String endDate;     // yyyy-MM-dd
         public UUID assigneeId;    // optionnel
         public String assigneeEmail; // optionnel
+        public UUID changedBy;     // optionnel: pour tracer qui modifie
     }
 
     private static LocalDate parseDate(String s) {
@@ -72,7 +78,19 @@ public class TaskController {
         );
     }
 
-    // ========= LIST
+    private TaskHistoryDTO toDto(TaskHistory h) {
+        return new TaskHistoryDTO(
+                h.getId(),
+                h.getTask().getId(),
+                h.getChangeLog(),
+                h.getChangedBy() != null ? h.getChangedBy().getId() : null,
+                h.getChangedBy() != null ? h.getChangedBy().getUsername() : null,
+                h.getChangedBy() != null ? h.getChangedBy().getEmail() : null,
+                h.getChangedAt()
+        );
+    }
+
+    // ===== LIST
     @GetMapping
     public ResponseEntity<?> list(@PathVariable UUID projectId) {
         if (projectRepo.findById(projectId).isEmpty()) {
@@ -84,7 +102,7 @@ public class TaskController {
         );
     }
 
-    // ========= GET ONE
+    // ===== GET ONE
     @GetMapping("/{taskId}")
     public ResponseEntity<?> getOne(@PathVariable UUID projectId, @PathVariable UUID taskId) {
         Optional<Task> opt = taskRepo.findById(taskId);
@@ -94,7 +112,27 @@ public class TaskController {
         return ResponseEntity.ok(toDto(opt.get()));
     }
 
-    // ========= CREATE
+    // ===== HISTORY
+    @GetMapping("/{taskId}/history")
+    public ResponseEntity<?> history(@PathVariable UUID projectId, @PathVariable UUID taskId) {
+        Optional<Task> opt = taskRepo.findById(taskId);
+        if (opt.isEmpty() || !opt.get().getProject().getId().equals(projectId)) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Task not found"));
+        }
+        return ResponseEntity.ok(
+                historyRepo.findByTaskIdOrderByChangedAtDesc(taskId).stream().map(this::toDto).toList()
+        );
+    }
+
+    private void saveHistory(Task task, User by, String log) {
+        TaskHistory h = new TaskHistory();
+        h.setTask(task);
+        h.setChangedBy(by);
+        h.setChangeLog(log);
+        historyRepo.save(h);
+    }
+
+    // ===== CREATE
     @PostMapping
     public ResponseEntity<?> create(@PathVariable UUID projectId, @RequestBody TaskRequest req) {
         if (req == null || req.title == null || req.title.trim().length() < 3) {
@@ -125,6 +163,19 @@ public class TaskController {
             }
 
             Task saved = taskRepo.save(t);
+
+            // Historique agrégé (change_log)
+            User changer = (req.changedBy != null) ? userRepo.findById(req.changedBy).orElse(null) : null;
+            StringBuilder log = new StringBuilder("CREATED");
+            log.append(": title='").append(saved.getTitle()).append("'");
+            if (saved.getDescription() != null) log.append("; description='").append(saved.getDescription()).append("'");
+            log.append("; status=").append(saved.getStatus().name());
+            log.append("; priority=").append(saved.getPriority().name());
+            if (saved.getDeadline() != null) log.append("; deadline=").append(saved.getDeadline());
+            if (saved.getEndDate() != null) log.append("; endDate=").append(saved.getEndDate());
+            if (saved.getAssignee() != null) log.append("; assigneeId=").append(saved.getAssignee().getId());
+            saveHistory(saved, changer, log.toString());
+
             return ResponseEntity.created(URI.create("/api/projects/" + projectId + "/tasks/" + saved.getId()))
                     .body(toDto(saved));
         } catch (IllegalArgumentException iae) {
@@ -137,7 +188,7 @@ public class TaskController {
         }
     }
 
-    // ========= UPDATE (PATCH partiel)
+    // ===== UPDATE (PATCH) — log agrégé des différences
     @PatchMapping("/{taskId}")
     public ResponseEntity<?> update(@PathVariable UUID projectId, @PathVariable UUID taskId, @RequestBody TaskRequest req) {
         Optional<Task> opt = taskRepo.findById(taskId);
@@ -145,40 +196,91 @@ public class TaskController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Task not found"));
         }
         Task t = opt.get();
+        User changer = (req.changedBy != null) ? userRepo.findById(req.changedBy).orElse(null) : null;
 
         try {
-            // champs textuels
-            if (req.title != null && !req.title.isBlank()) t.setTitle(req.title.trim());
-            if (req.description != null) t.setDescription(req.description);
+            List<String> diffs = new ArrayList<>();
 
-            // enums
-            if (req.status != null) t.setStatus(parseStatus(req.status));
-            if (req.priority != null) t.setPriority(parsePriority(req.priority));
-
-            // dates
-            if (req.deadline != null) t.setDeadline(parseDate(req.deadline));
-            if (req.endDate != null) t.setEndDate(parseDate(req.endDate));
-
-            // assignee
+            if (req.title != null && !Objects.equals(req.title.trim(), t.getTitle())) {
+                diffs.add("title: '" + t.getTitle() + "' -> '" + req.title.trim() + "'");
+                t.setTitle(req.title.trim());
+            }
+            if (req.description != null && !Objects.equals(req.description, t.getDescription())) {
+                String oldS = t.getDescription();
+                String newS = req.description;
+                diffs.add("description: '" + (oldS == null ? "" : oldS) + "' -> '" + (newS == null ? "" : newS) + "'");
+                t.setDescription(req.description);
+            }
+            if (req.status != null) {
+                TaskStatusEnum newS = parseStatus(req.status);
+                if (!Objects.equals(newS, t.getStatus())) {
+                    diffs.add("status: " + t.getStatus().name() + " -> " + newS.name());
+                    t.setStatus(newS);
+                }
+            }
+            if (req.priority != null) {
+                TaskPriorityEnum newP = parsePriority(req.priority);
+                if (!Objects.equals(newP, t.getPriority())) {
+                    diffs.add("priority: " + t.getPriority().name() + " -> " + newP.name());
+                    t.setPriority(newP);
+                }
+            }
+            if (req.deadline != null) {
+                var newD = parseDate(req.deadline);
+                String oldStr = (t.getDeadline() == null ? null : t.getDeadline().toString());
+                String newStr = (newD == null ? null : newD.toString());
+                if (!Objects.equals(oldStr, newStr)) {
+                    diffs.add("deadline: " + oldStr + " -> " + newStr);
+                    t.setDeadline(newD);
+                }
+            }
+            if (req.endDate != null) {
+                var newE = parseDate(req.endDate);
+                String oldStr = (t.getEndDate() == null ? null : t.getEndDate().toString());
+                String newStr = (newE == null ? null : newE.toString());
+                if (!Objects.equals(oldStr, newStr)) {
+                    diffs.add("endDate: " + oldStr + " -> " + newStr);
+                    t.setEndDate(newE);
+                }
+            }
             if (req.assigneeId != null) {
+                UUID oldId = t.getAssignee() != null ? t.getAssignee().getId() : null;
                 if (req.assigneeId.toString().isBlank()) {
-                    t.setAssignee(null); // désassigner si string vide envoyée castée en UUID impossible -> on n'entre pas ici
-                } else {
-                    userRepo.findById(req.assigneeId).ifPresentOrElse(t::setAssignee,
-                            () -> { throw new IllegalArgumentException("assigneeId not found"); });
+                    if (oldId != null) {
+                        diffs.add("assigneeId: " + oldId + " -> null");
+                        t.setAssignee(null);
+                    }
+                } else if (!Objects.equals(oldId, req.assigneeId)) {
+                    var u = userRepo.findById(req.assigneeId)
+                            .orElseThrow(() -> new IllegalArgumentException("assigneeId not found"));
+                    diffs.add("assigneeId: " + (oldId == null ? null : oldId) + " -> " + u.getId());
+                    t.setAssignee(u);
                 }
             } else if (req.assigneeEmail != null) {
+                UUID oldId = t.getAssignee() != null ? t.getAssignee().getId() : null;
                 if (req.assigneeEmail.isBlank()) {
-                    t.setAssignee(null);
+                    if (oldId != null) {
+                        diffs.add("assigneeEmail: " + oldId + " -> null");
+                        t.setAssignee(null);
+                    }
                 } else {
-                    var u = userRepo.findByEmail(req.assigneeEmail.trim());
-                    if (u.isPresent()) t.setAssignee(u.get());
-                    else throw new IllegalArgumentException("assigneeEmail not found");
+                    var u = userRepo.findByEmail(req.assigneeEmail.trim())
+                            .orElseThrow(() -> new IllegalArgumentException("assigneeEmail not found"));
+                    if (!Objects.equals(oldId, u.getId())) {
+                        diffs.add("assigneeEmail: " + (oldId == null ? null : oldId) + " -> " + u.getId());
+                        t.setAssignee(u);
+                    }
                 }
             }
 
-            Task saved = taskRepo.save(t);
-            return ResponseEntity.ok(toDto(saved));
+            if (!diffs.isEmpty()) {
+                Task saved = taskRepo.save(t);
+                String log = "UPDATED: " + String.join("; ", diffs);
+                saveHistory(saved, changer, log);
+                return ResponseEntity.ok(toDto(saved));
+            } else {
+                return ResponseEntity.ok(toDto(t));
+            }
         } catch (IllegalArgumentException iae) {
             return ResponseEntity.badRequest().body(Map.of("error", "Invalid assignee", "details", iae.getMessage()));
         } catch (Exception ex) {
