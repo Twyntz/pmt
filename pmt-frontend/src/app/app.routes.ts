@@ -1,10 +1,11 @@
 import { Routes } from '@angular/router';
 import { LoginComponent } from './pages/login/login.component';
 import { RegisterComponent } from './pages/register/register.component';
-import { authGuard } from './guards/auth.guard';
 import { Component } from '@angular/core';
+import { authGuard } from './guards/auth.guard';
 import { ProjectListComponent } from './pages/projects/project-list/project-list.component';
 import { ProjectCreateComponent } from './pages/projects/project-create/project-create.component';
+import { ProjectDetailsComponent } from './pages/projects/project-details/project-details.component';
 
 @Component({
   selector: 'app-dashboard',
@@ -20,5 +21,6 @@ export const routes: Routes = [
   { path: 'dashboard', component: DashboardComponent, canActivate: [authGuard] },
   { path: 'projects', component: ProjectListComponent, canActivate: [authGuard] },
   { path: 'projects/create', component: ProjectCreateComponent, canActivate: [authGuard] },
+  { path: 'projects/:id', component: ProjectDetailsComponent, canActivate: [authGuard] },  
   { path: '**', redirectTo: 'dashboard' }
 ];

@@ -18,17 +18,13 @@
     <tbody>
       <tr *ngFor="let p of projects; trackBy: trackById">
         <td class="border p-2">{{ p.id }}</td>
-        <td class="border p-2">{{ p.name }}</td>
+        <td class="border p-2">
+          <a class="underline" [routerLink]="['/projects', p.id]">{{ p.name }}</a>
+        </td>
         <td class="border p-2">{{ p.description }}</td>
-        <td class="border p-2">
-          <!-- p.startDate peut arriver en 'YYYY-MM-DD' : on l'affiche tel quel -->
-          {{ p.startDate || '' }}
-        </td>
+        <td class="border p-2">{{ p.startDate || '' }}</td>
         <td class="border p-2">{{ p.ownerId }}</td>
-        <td class="border p-2">
-          <!-- p.createdAt peut être ISO ou localDateTime : on tronque proprement -->
-          {{ (p.createdAt || '').toString().replace('T', ' ').slice(0, 19) }}
-        </td>
+        <td class="border p-2">{{ (p.createdAt || '').toString().replace('T', ' ').slice(0, 19) }}</td>
       </tr>
     </tbody>
   </table>

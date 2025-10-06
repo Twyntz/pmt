@@ -1,7 +1,98 @@
-<h2>Détails du projet</h2>
-<ul>
-  <li><strong>Nom :</strong> {{ project.name }}</li>
-  <li><strong>Description :</strong> {{ project.description }}</li>
-  <li><strong>Propriétaire :</strong> {{ project.owner }}</li>
-  <li><strong>Date de début :</strong> {{ project.startDate }}</li>
-</ul>
+<div class="max-w-6xl mx-auto p-6">
+  <a routerLink="/projects" class="text-sm underline text-gray-600">← Retour à la liste</a>
+
+  <!-- Infos projet -->
+  <div class="mt-4 p-4 border rounded">
+    <h1 class="text-2xl font-semibold">Détails du projet</h1>
+
+    <div *ngIf="loadingProject" class="mt-2 text-gray-600">Chargement…</div>
+    <div *ngIf="errorProject" class="mt-2 text-red-700 bg-red-50 border border-red-200 p-2 rounded">
+      {{ errorProject }}
+    </div>
+
+    <div *ngIf="project && !loadingProject" class="mt-3 grid gap-2 md:grid-cols-2">
+      <div><span class="font-medium">Nom :</span> {{ project.name }}</div>
+      <div><span class="font-medium">Début :</span> {{ project.startDate || '—' }}</div>
+      <div class="md:col-span-2">
+        <span class="font-medium">Description :</span> {{ project.description || '—' }}
+      </div>
+      <div><span class="font-medium">Owner :</span> {{ project.ownerId }}</div>
+      <div><span class="font-medium">Créé le :</span> {{ (project.createdAt || '').toString().replace('T',' ').slice(0,19) }}</div>
+    </div>
+  </div>
+
+  <!-- Membres -->
+  <div class="mt-6 p-4 border rounded">
+    <div class="flex items-center justify-between">
+      <h2 class="text-xl font-semibold">Membres</h2>
+      <button class="text-sm underline" (click)="loadMembers()">Rafraîchir</button>
+    </div>
+
+    <div *ngIf="loadingMembers" class="mt-2 text-gray-600">Chargement…</div>
+    <div *ngIf="errorMembers" class="mt-2 text-red-700 bg-red-50 border border-red-200 p-2 rounded">
+      {{ errorMembers }}
+    </div>
+
+    <table *ngIf="!loadingMembers && members.length" class="w-full border-collapse border mt-3">
+      <thead class="bg-gray-100">
+        <tr>
+          <th class="border p-2 text-left">Utilisateur</th>
+          <th class="border p-2 text-left">Email</th>
+          <th class="border p-2 text-left">Rôle</th>
+          <th class="border p-2 text-left">Ajouté le</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let m of members">
+          <td class="border p-2">{{ m.username }}</td>
+          <td class="border p-2">{{ m.email }}</td>
+          <td class="border p-2">{{ m.role }}</td>
+          <td class="border p-2">{{ (m.createdAt || '').toString().replace('T',' ').slice(0,19) }}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div *ngIf="!loadingMembers && !members.length" class="text-gray-600 mt-2">
+      Aucun membre pour l’instant.
+    </div>
+  </div>
+
+  <!-- Invitation (seulement pour le owner) -->
+  <div class="mt-6 p-4 border rounded" *ngIf="isOwner()">
+    <h2 class="text-xl font-semibold mb-3">Inviter un membre</h2>
+
+    <form [formGroup]="inviteForm" (ngSubmit)="invite()" class="grid gap-3 md:grid-cols-3">
+      <div class="md:col-span-2">
+        <label class="block text-sm font-medium mb-1">Email</label>
+        <input type="email" class="w-full border rounded p-2" formControlName="email" placeholder="user@example.com" />
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium mb-1">Rôle</label>
+        <select class="w-full border rounded p-2" formControlName="role">
+          <option value="ADMIN">Administrateur</option>
+          <option value="MEMBER">Membre</option>
+          <option value="VIEWER">Lecteur</option>
+        </select>
+      </div>
+
+      <div class="md:col-span-3">
+        <button type="submit" class="px-4 py-2 rounded bg-black text-white disabled:opacity-50"
+                [disabled]="inviting || inviteForm.invalid">
+          {{ inviting ? 'Invitation…' : 'Inviter' }}
+        </button>
+      </div>
+    </form>
+
+    <div *ngIf="inviteSuccess" class="text-green-700 bg-green-50 border border-green-200 rounded p-2 mt-3">
+      {{ inviteSuccess }}
+    </div>
+    <div *ngIf="inviteError" class="text-red-700 bg-red-50 border border-red-200 rounded p-2 mt-3">
+      {{ inviteError }}
+    </div>
+  </div>
+
+  <div *ngIf="!isOwner()" class="mt-6 text-sm text-gray-600">
+    Seul le propriétaire du projet peut inviter de nouveaux membres.
+  </div>
+</div>

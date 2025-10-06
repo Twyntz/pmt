@@ -18,14 +18,16 @@ CREATE TABLE IF NOT EXISTS projects (
     FOREIGN KEY (owner_id) REFERENCES users(id)
 );
 
--- Table project_members
+-- table des membres de projet
 CREATE TABLE IF NOT EXISTS project_members (
     id CHAR(36) PRIMARY KEY,
-    user_id CHAR(36),
-    project_id CHAR(36),
-    role ENUM('ADMIN', 'MEMBER', 'OBSERVER') NOT NULL,
-    FOREIGN KEY (user_id) REFERENCES users(id),
-    FOREIGN KEY (project_id) REFERENCES projects(id)
+    project_id CHAR(36) NOT NULL,
+    user_id CHAR(36) NOT NULL,
+    role VARCHAR(20) NOT NULL DEFAULT 'MEMBER',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_pm_project FOREIGN KEY (project_id) REFERENCES projects(id),
+    CONSTRAINT fk_pm_user FOREIGN KEY (user_id) REFERENCES users(id),
+    CONSTRAINT uq_pm UNIQUE (project_id, user_id)
 );
 
 -- Table tasks
