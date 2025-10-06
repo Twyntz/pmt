@@ -13,7 +13,7 @@ export interface TaskPayload {
   deadline?: string;   // YYYY-MM-DD
   endDate?: string;    // YYYY-MM-DD
   assigneeId?: string | null;
-  assigneeEmail?: string | null; // encore supporté en fallback si besoin
+  assigneeEmail?: string | null;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -24,17 +24,16 @@ export class TaskService {
     return this.http.get<any[]>(`/api/projects/${projectId}/tasks`);
   }
 
+  get(projectId: string, taskId: string): Observable<any> {
+    return this.http.get<any>(`/api/projects/${projectId}/tasks/${taskId}`);
+  }
+
   create(projectId: string, payload: TaskPayload): Observable<any> {
-    const body = {
-      title: payload.title ?? '',
-      description: payload.description ?? '',
-      status: (payload.status ?? 'TODO') as TaskStatus,
-      priority: (payload.priority ?? 'MEDIUM') as TaskPriority,
-      deadline: payload.deadline ?? '',
-      endDate: payload.endDate ?? '',
-      assigneeId: payload.assigneeId ?? null,
-      assigneeEmail: payload.assigneeEmail ?? '' // toléré côté back
-    };
-    return this.http.post<any>(`/api/projects/${projectId}/tasks`, body);
+    return this.http.post<any>(`/api/projects/${projectId}/tasks`, payload);
+  }
+
+  /** Mise à jour partielle (PATCH) */
+  update(projectId: string, taskId: string, payload: Partial<TaskPayload>): Observable<any> {
+    return this.http.patch<any>(`/api/projects/${projectId}/tasks/${taskId}`, payload);
   }
 }

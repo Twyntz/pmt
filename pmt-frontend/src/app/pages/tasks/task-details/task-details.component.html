@@ -1,11 +1,71 @@
-<h2>Détails de la tâche</h2>
+<div class="max-w-3xl mx-auto p-6 border rounded">
+  <div class="flex items-center justify-between">
+    <button class="text-sm underline" (click)="goBack()">← Retour au projet</button>
+    <button class="text-sm underline" (click)="load()">Rafraîchir</button>
+  </div>
 
-<div class="task-details">
-  <p><strong>Titre :</strong> {{ task.title }}</p>
-  <p><strong>Description :</strong> {{ task.description }}</p>
-  <p><strong>Statut :</strong> {{ task.status }}</p>
-  <p><strong>Priorité :</strong> {{ task.priority }}</p>
-  <p><strong>Date limite :</strong> {{ task.deadline }}</p>
-  <p><strong>Date de fin :</strong> {{ task.endDate || 'Non définie' }}</p>
-  <p><strong>Assignée à :</strong> {{ task.assignee }}</p>
+  <h1 class="text-2xl font-semibold mt-2">Détails de la tâche</h1>
+
+  <div *ngIf="loading" class="mt-2 text-gray-600">Chargement…</div>
+  <div *ngIf="error" class="mt-2 text-red-700 bg-red-50 border border-red-200 p-2 rounded">{{ error }}</div>
+
+  <ng-container *ngIf="task && !loading">
+    <dl class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div>
+        <dt class="text-sm text-gray-500">Titre</dt>
+        <dd class="text-base font-medium">{{ task.title }}</dd>
+      </div>
+
+      <div>
+        <dt class="text-sm text-gray-500">Statut</dt>
+        <dd class="text-base">{{ task.status }}</dd>
+      </div>
+
+      <div>
+        <dt class="text-sm text-gray-500">Priorité</dt>
+        <dd class="text-base"
+            [class]="
+              task.priority === 'HIGH' ? 'text-red-600' :
+              task.priority === 'LOW' ? 'text-gray-600' : 'text-yellow-700'
+            ">
+          {{ task.priority }}
+        </dd>
+      </div>
+
+      <div>
+        <dt class="text-sm text-gray-500">Créée le</dt>
+        <dd class="text-base">{{ (task.createdAt || '').toString().replace('T',' ').slice(0,19) }}</dd>
+      </div>
+
+      <div>
+        <dt class="text-sm text-gray-500">Échéance</dt>
+        <dd class="text-base">{{ task.deadline || '—' }}</dd>
+      </div>
+
+      <div>
+        <dt class="text-sm text-gray-500">Date de fin</dt>
+        <dd class="text-base">{{ task.endDate || '—' }}</dd>
+      </div>
+
+      <div class="sm:col-span-2">
+        <dt class="text-sm text-gray-500">Assignée à</dt>
+        <dd class="text-base">
+          {{ task.assigneeUsername || task.assigneeEmail || '—' }}
+        </dd>
+      </div>
+
+      <div class="sm:col-span-2">
+        <dt class="text-sm text-gray-500">Description</dt>
+        <dd class="text-base whitespace-pre-line">{{ task.description || '—' }}</dd>
+      </div>
+    </dl>
+
+    <div class="mt-6 flex items-center gap-3">
+      <a *ngIf="canEdit()"
+         class="px-4 py-2 rounded bg-black text-white"
+         [routerLink]="['/projects', projectId, 'tasks', task.id, 'edit']">
+        Modifier
+      </a>
+    </div>
+  </ng-container>
 </div>

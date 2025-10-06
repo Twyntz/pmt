@@ -7,6 +7,8 @@ import { ProjectListComponent } from './pages/projects/project-list/project-list
 import { ProjectCreateComponent } from './pages/projects/project-create/project-create.component';
 import { ProjectDetailsComponent } from './pages/projects/project-details/project-details.component';
 import { TaskCreateComponent } from './pages/tasks/task-create/task-create.component';
+import { TaskEditComponent } from './pages/tasks/task-edit/task-edit.component';
+import { TaskDetailsComponent } from './pages/tasks/task-details/task-details.component';
 
 @Component({
   selector: 'app-dashboard',
@@ -24,5 +26,7 @@ export const routes: Routes = [
   { path: 'projects/create', component: ProjectCreateComponent, canActivate: [authGuard] },
   { path: 'projects/:id', component: ProjectDetailsComponent, canActivate: [authGuard] }, 
   { path: 'projects/:id/tasks/create', component: TaskCreateComponent, canActivate: [authGuard] }, 
+  { path: 'projects/:id/tasks/:taskId', component: TaskDetailsComponent, canActivate: [authGuard] },
+  { path: 'projects/:id/tasks/:taskId/edit', component: TaskEditComponent, canActivate: [authGuard] },
   { path: '**', redirectTo: 'dashboard' }
 ];
