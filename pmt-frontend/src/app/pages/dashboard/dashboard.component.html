@@ -1,2 +1,210 @@
-<h1>Dashboard</h1>
-<p>Bienvenue sur votre tableau de bord !</p>
+<div class="max-w-7xl mx-auto p-6">
+  <div class="flex items-center justify-between">
+    <h1 class="text-2xl font-semibold">Tableau de bord — Tâches par statut</h1>
+    <button class="text-sm underline" (click)="refresh()">Rafraîchir</button>
+  </div>
+
+  <!-- ===================== Projets (filtrés) ===================== -->
+  <div class="mt-4 p-4 border rounded">
+    <h2 class="text-xl font-semibold mb-2">Projets visibles</h2>
+
+    <div *ngIf="loadingProjects" class="text-gray-600">Chargement des projets…</div>
+    <div *ngIf="errorProjects" class="mt-2 text-red-700 bg-red-50 border border-red-200 p-2 rounded">
+      {{ errorProjects }}
+    </div>
+
+    <div *ngIf="!loadingProjects && projects?.length" class="flex flex-wrap gap-3 mt-2">
+      <label class="inline-flex items-center gap-2 px-3 py-2 rounded border"
+             *ngFor="let p of projects; trackBy: trackById">
+        <input type="checkbox"
+               [checked]="selectedProjectIds.includes(getId(p))"
+               (change)="toggleProject(p, $event)" />
+        <span class="text-sm">{{ p?.name || p?.title || ('Projet #' + getId(p)) }}</span>
+      </label>
+    </div>
+
+    <div *ngIf="!loadingProjects && !projects?.length" class="text-gray-600">
+      Aucun projet accessible pour cet utilisateur.
+    </div>
+  </div>
+
+  <!-- ===================== Stats ===================== -->
+  <div class="mt-4 grid gap-4 md:grid-cols-3">
+    <div class="p-4 border rounded">
+      <div class="text-sm text-gray-600">Total</div>
+      <div class="text-2xl font-bold">{{ totals.all }}</div>
+    </div>
+    <div class="p-4 border rounded">
+      <div class="text-sm text-gray-600">À faire</div>
+      <div class="text-2xl font-bold">{{ totals.todo }}</div>
+    </div>
+    <div class="p-4 border rounded">
+      <div class="text-sm text-gray-600">En cours</div>
+      <div class="text-2xl font-bold">{{ totals.inProgress }}</div>
+    </div>
+  </div>
+
+  <!-- ===================== Tâches par statut ===================== -->
+
+  <!-- ====== TODO ====== -->
+  <div class="mt-6 p-4 border rounded">
+    <div class="flex items-center justify-between">
+      <h2 class="text-xl font-semibold">Tâches — À faire</h2>
+    </div>
+
+    <div *ngIf="loadingTasks" class="mt-2 text-gray-600">Chargement…</div>
+    <div *ngIf="errorTasks" class="mt-2 text-red-700 bg-red-50 border border-red-200 p-2 rounded">
+      {{ errorTasks }}
+    </div>
+
+    <table *ngIf="!loadingTasks && todo.length" class="w-full border-collapse border mt-3">
+      <thead class="bg-gray-100">
+        <tr>
+          <th class="border p-2 text-left">Projet</th>
+          <th class="border p-2 text-left">Titre</th>
+          <th class="border p-2 text-left">Description</th>
+          <th class="border p-2 text-left">Statut</th>
+          <th class="border p-2 text-left">Priorité</th>
+          <th class="border p-2 text-left">Échéance</th>
+          <th class="border p-2 text-left">Fin</th>
+          <th class="border p-2 text-left">Assigné à</th>
+          <th class="border p-2 text-left">Créée le</th>
+          <th class="border p-2"></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let t of todo; trackBy: trackById">
+          <td class="border p-2">
+            <a class="underline" [routerLink]="['/projects', t?.projectId || '']">{{ t.projectName }}</a>
+          </td>
+          <td class="border p-2">
+            <a class="underline" [routerLink]="['/projects', t?.projectId || '', 'tasks', t?.id || '']">{{ t.title }}</a>
+          </td>
+          <td class="border p-2">{{ t.description || '—' }}</td>
+          <td class="border p-2">{{ t.status }}</td>
+          <td class="border p-2">
+            <span [class]="
+              t.priority === 'HIGH' ? 'text-red-600' :
+              t.priority === 'LOW' ? 'text-gray-600' : 'text-yellow-700'
+            ">{{ t.priority || '—' }}</span>
+          </td>
+          <td class="border p-2">{{ t.deadline || '—' }}</td>
+          <td class="border p-2">{{ t.endDate || '—' }}</td>
+          <td class="border p-2">{{ t.assigneeUsername || t.assigneeEmail || '—' }}</td>
+          <td class="border p-2">{{ createdAtDisplay(t.createdAt) }}</td>
+          <td class="border p-2">
+            <a class="text-sm underline" [routerLink]="['/projects', t?.projectId || '', 'tasks', t?.id || '', 'edit']">Modifier</a>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div *ngIf="!loadingTasks && !todo.length" class="text-gray-600 mt-2">Aucune tâche à faire.</div>
+  </div>
+
+  <!-- ====== IN PROGRESS ====== -->
+  <div class="mt-6 p-4 border rounded">
+    <div class="flex items-center justify-between">
+      <h2 class="text-xl font-semibold">Tâches — En cours</h2>
+    </div>
+
+    <div *ngIf="loadingTasks" class="mt-2 text-gray-600">Chargement…</div>
+
+    <table *ngIf="!loadingTasks && inProgress.length" class="w-full border-collapse border mt-3">
+      <thead class="bg-gray-100">
+        <tr>
+          <th class="border p-2 text-left">Projet</th>
+          <th class="border p-2 text-left">Titre</th>
+          <th class="border p-2 text-left">Description</th>
+          <th class="border p-2 text-left">Statut</th>
+          <th class="border p-2 text-left">Priorité</th>
+          <th class="border p-2 text-left">Échéance</th>
+          <th class="border p-2 text-left">Fin</th>
+          <th class="border p-2 text-left">Assigné à</th>
+          <th class="border p-2 text-left">Créée le</th>
+          <th class="border p-2"></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let t of inProgress; trackBy: trackById">
+          <td class="border p-2">
+            <a class="underline" [routerLink]="['/projects', t?.projectId || '']">{{ t.projectName }}</a>
+          </td>
+          <td class="border p-2">
+            <a class="underline" [routerLink]="['/projects', t?.projectId || '', 'tasks', t?.id || '']">{{ t.title }}</a>
+          </td>
+          <td class="border p-2">{{ t.description || '—' }}</td>
+          <td class="border p-2">{{ t.status }}</td>
+          <td class="border p-2">
+            <span [class]="
+              t.priority === 'HIGH' ? 'text-red-600' :
+              t.priority === 'LOW' ? 'text-gray-600' : 'text-yellow-700'
+            ">{{ t.priority || '—' }}</span>
+          </td>
+          <td class="border p-2">{{ t.deadline || '—' }}</td>
+          <td class="border p-2">{{ t.endDate || '—' }}</td>
+          <td class="border p-2">{{ t.assigneeUsername || t.assigneeEmail || '—' }}</td>
+          <td class="border p-2">{{ createdAtDisplay(t.createdAt) }}</td>
+          <td class="border p-2">
+            <a class="text-sm underline" [routerLink]="['/projects', t?.projectId || '', 'tasks', t?.id || '', 'edit']">Modifier</a>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div *ngIf="!loadingTasks && !inProgress.length" class="text-gray-600 mt-2">Aucune tâche en cours.</div>
+  </div>
+
+  <!-- ====== DONE ====== -->
+  <div class="mt-6 p-4 border rounded">
+    <div class="flex items-center justify-between">
+      <h2 class="text-xl font-semibold">Tâches — Terminées</h2>
+    </div>
+
+    <div *ngIf="loadingTasks" class="mt-2 text-gray-600">Chargement…</div>
+
+    <table *ngIf="!loadingTasks && done.length" class="w-full border-collapse border mt-3">
+      <thead class="bg-gray-100">
+        <tr>
+          <th class="border p-2 text-left">Projet</th>
+          <th class="border p-2 text-left">Titre</th>
+          <th class="border p-2 text-left">Description</th>
+          <th class="border p-2 text-left">Statut</th>
+          <th class="border p-2 text-left">Priorité</th>
+          <th class="border p-2 text-left">Échéance</th>
+          <th class="border p-2 text-left">Fin</th>
+          <th class="border p-2 text-left">Assigné à</th>
+          <th class="border p-2 text-left">Créée le</th>
+          <th class="border p-2"></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let t of done; trackBy: trackById">
+          <td class="border p-2">
+            <a class="underline" [routerLink]="['/projects', t?.projectId || '']">{{ t.projectName }}</a>
+          </td>
+          <td class="border p-2">
+            <a class="underline" [routerLink]="['/projects', t?.projectId || '', 'tasks', t?.id || '']">{{ t.title }}</a>
+          </td>
+          <td class="border p-2">{{ t.description || '—' }}</td>
+          <td class="border p-2">{{ t.status }}</td>
+          <td class="border p-2">
+            <span [class]="
+              t.priority === 'HIGH' ? 'text-red-600' :
+              t.priority === 'LOW' ? 'text-gray-600' : 'text-yellow-700'
+            ">{{ t.priority || '—' }}</span>
+          </td>
+          <td class="border p-2">{{ t.deadline || '—' }}</td>
+          <td class="border p-2">{{ t.endDate || '—' }}</td>
+          <td class="border p-2">{{ t.assigneeUsername || t.assigneeEmail || '—' }}</td>
+          <td class="border p-2">{{ createdAtDisplay(t.createdAt) }}</td>
+          <td class="border p-2">
+            <a class="text-sm underline" [routerLink]="['/projects', t?.projectId || '', 'tasks', t?.id || '', 'edit']">Modifier</a>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div *ngIf="!loadingTasks && !done.length" class="text-gray-600 mt-2">Aucune tâche terminée.</div>
+  </div>
+</div>

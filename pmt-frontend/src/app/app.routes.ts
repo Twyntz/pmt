@@ -10,13 +10,8 @@ import { TaskCreateComponent } from './pages/tasks/task-create/task-create.compo
 import { TaskEditComponent } from './pages/tasks/task-edit/task-edit.component';
 import { TaskDetailsComponent } from './pages/tasks/task-details/task-details.component';
 import { TaskHistoryComponent } from './pages/tasks/task-history/task-history.component';
+import { DashboardComponent } from './pages/dashboard/dashboard.component';
 
-@Component({
-  selector: 'app-dashboard',
-  standalone: true,
-  template: `<h1 class="text-2xl font-semibold mb-4">Dashboard</h1><p>Bienvenue !</p>`
-})
-export class DashboardComponent {}
 
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
