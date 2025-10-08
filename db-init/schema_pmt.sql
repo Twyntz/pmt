@@ -57,18 +57,6 @@ CREATE TABLE IF NOT EXISTS task_history (
     FOREIGN KEY (changed_by) REFERENCES users(id)
 );
 
--- Table notifications
-CREATE TABLE IF NOT EXISTS notifications (
-    id CHAR(36) PRIMARY KEY,
-    user_id CHAR(36),
-    task_id CHAR(36),
-    message TEXT NOT NULL,
-    is_read BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id),
-    FOREIGN KEY (task_id) REFERENCES tasks(id)
-);
-
 -- ===========================
 -- Données de test
 -- ===========================
@@ -106,7 +94,3 @@ INSERT INTO task_history (id, task_id, changed_by, change_log)
 VALUES
 (UUID(), (SELECT id FROM tasks WHERE title = 'Setup backend'), (SELECT id FROM users WHERE username = 'alice'), 'Initial setup done');
 
--- Notifications
-INSERT INTO notifications (id, user_id, task_id, message)
-VALUES
-(UUID(), (SELECT id FROM users WHERE username = 'bob'), (SELECT id FROM tasks WHERE title = 'Create frontend'), 'Nouvelle tâche assignée');

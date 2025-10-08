@@ -7,9 +7,11 @@ import com.codesolutions.pmt_backend.Repository.ProjectRepository;
 import com.codesolutions.pmt_backend.Repository.TaskHistoryRepository;
 import com.codesolutions.pmt_backend.Repository.TaskRepository;
 import com.codesolutions.pmt_backend.Repository.UserRepository;
+import com.codesolutions.pmt_backend.Service.MailService;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.lang.Nullable;
 import org.springframework.web.bind.annotation.*;
 
 import java.net.URI;
@@ -25,15 +27,18 @@ public class TaskController {
     private final ProjectRepository projectRepo;
     private final UserRepository userRepo;
     private final TaskHistoryRepository historyRepo;
+    private final MailService mailService;
 
     public TaskController(TaskRepository taskRepo,
                           ProjectRepository projectRepo,
                           UserRepository userRepo,
-                          TaskHistoryRepository historyRepo) {
+                          TaskHistoryRepository historyRepo,
+                          MailService mailService) {
         this.taskRepo = taskRepo;
         this.projectRepo = projectRepo;
         this.userRepo = userRepo;
         this.historyRepo = historyRepo;
+        this.mailService = mailService;
     }
 
     public static class TaskRequest {
@@ -132,6 +137,52 @@ public class TaskController {
         historyRepo.save(h);
     }
 
+    // ===== Utilities: e-mail content =====
+    private String buildTaskAssignedSubject(Task task) {
+        return "[PMT] Nouvelle tâche assignée: " + task.getTitle();
+    }
+
+    private String buildTaskAssignedBody(Task task, @Nullable User changer) {
+        String front = mailService.getFrontendUrl();
+        String link = String.format("%s/projects/%s/tasks/%s",
+                front,
+                task.getProject().getId(),
+                task.getId()
+        );
+        String by = (changer != null)
+                ? (changer.getUsername() != null ? changer.getUsername() : changer.getEmail())
+                : "Système";
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("Bonjour,\n\n");
+        sb.append("Une tâche vient de vous être assignée.\n\n");
+        sb.append("Titre      : ").append(task.getTitle()).append("\n");
+        sb.append("Projet     : ").append(task.getProject().getName()).append("\n");
+        sb.append("Statut     : ").append(task.getStatus().name()).append("\n");
+        sb.append("Priorité   : ").append(task.getPriority().name()).append("\n");
+        if (task.getDeadline() != null) sb.append("Échéance   : ").append(task.getDeadline()).append("\n");
+        if (task.getEndDate() != null) sb.append("Fin        : ").append(task.getEndDate()).append("\n");
+        sb.append("Assignée par : ").append(by).append("\n");
+        sb.append("\nDétails : ").append(link).append("\n");
+        sb.append("\n--\nPMT");
+        return sb.toString();
+    }
+
+    private void safeSendAssignmentMail(@Nullable User to, Task task, @Nullable User changer) {
+        try {
+            if (to != null && to.getEmail() != null && !to.getEmail().isBlank()) {
+                mailService.sendText(
+                        to.getEmail(),
+                        buildTaskAssignedSubject(task),
+                        buildTaskAssignedBody(task, changer),
+                        null
+                );
+            }
+        } catch (Exception e) {
+            // On ne bloque pas la requête si l'envoi échoue
+        }
+    }
+
     // ===== CREATE
     @PostMapping
     public ResponseEntity<?> create(@PathVariable UUID projectId, @RequestBody TaskRequest req) {
@@ -153,19 +204,21 @@ public class TaskController {
             t.setDeadline(parseDate(req.deadline));
             t.setEndDate(parseDate(req.endDate));
 
+            User assignee = null;
             if (req.assigneeId != null) {
-                userRepo.findById(req.assigneeId).ifPresentOrElse(t::setAssignee,
-                        () -> { throw new IllegalArgumentException("assigneeId not found"); });
+                assignee = userRepo.findById(req.assigneeId)
+                        .orElseThrow(() -> new IllegalArgumentException("assigneeId not found"));
+                t.setAssignee(assignee);
             } else if (req.assigneeEmail != null && !req.assigneeEmail.isBlank()) {
-                var u = userRepo.findByEmail(req.assigneeEmail.trim());
-                if (u.isPresent()) t.setAssignee(u.get());
-                else throw new IllegalArgumentException("assigneeEmail not found");
+                assignee = userRepo.findByEmail(req.assigneeEmail.trim())
+                        .orElseThrow(() -> new IllegalArgumentException("assigneeEmail not found"));
+                t.setAssignee(assignee);
             }
 
             Task saved = taskRepo.save(t);
 
-            // Historique agrégé (change_log)
             User changer = (req.changedBy != null) ? userRepo.findById(req.changedBy).orElse(null) : null;
+            // Historique
             StringBuilder log = new StringBuilder("CREATED");
             log.append(": title='").append(saved.getTitle()).append("'");
             if (saved.getDescription() != null) log.append("; description='").append(saved.getDescription()).append("'");
@@ -175,6 +228,11 @@ public class TaskController {
             if (saved.getEndDate() != null) log.append("; endDate=").append(saved.getEndDate());
             if (saved.getAssignee() != null) log.append("; assigneeId=").append(saved.getAssignee().getId());
             saveHistory(saved, changer, log.toString());
+
+            // Notification si la tâche est assignée à la création
+            if (assignee != null) {
+                safeSendAssignmentMail(assignee, saved, changer);
+            }
 
             return ResponseEntity.created(URI.create("/api/projects/" + projectId + "/tasks/" + saved.getId()))
                     .body(toDto(saved));
@@ -188,7 +246,7 @@ public class TaskController {
         }
     }
 
-    // ===== UPDATE (PATCH) — log agrégé des différences
+    // ===== UPDATE (PATCH) — log agrégé des différences + notif si assignation change
     @PatchMapping("/{taskId}")
     public ResponseEntity<?> update(@PathVariable UUID projectId, @PathVariable UUID taskId, @RequestBody TaskRequest req) {
         Optional<Task> opt = taskRepo.findById(taskId);
@@ -200,6 +258,7 @@ public class TaskController {
 
         try {
             List<String> diffs = new ArrayList<>();
+            UUID oldAssigneeId = (t.getAssignee() != null ? t.getAssignee().getId() : null);
 
             if (req.title != null && !Objects.equals(req.title.trim(), t.getTitle())) {
                 diffs.add("title: '" + t.getTitle() + "' -> '" + req.title.trim() + "'");
@@ -243,32 +302,41 @@ public class TaskController {
                     t.setEndDate(newE);
                 }
             }
+
+            // --- Assignation (détermine si l'on doit envoyer un e-mail)
+            User newAssignee = null;
+            boolean assignmentChanged = false;
+
             if (req.assigneeId != null) {
-                UUID oldId = t.getAssignee() != null ? t.getAssignee().getId() : null;
-                if (req.assigneeId.toString().isBlank()) {
-                    if (oldId != null) {
-                        diffs.add("assigneeId: " + oldId + " -> null");
+                UUID newId = req.assigneeId.toString().isBlank() ? null : req.assigneeId;
+                if (newId == null) {
+                    if (oldAssigneeId != null) {
+                        diffs.add("assigneeId: " + oldAssigneeId + " -> null");
                         t.setAssignee(null);
+                        assignmentChanged = true; // désassignation (pas de mail)
                     }
-                } else if (!Objects.equals(oldId, req.assigneeId)) {
-                    var u = userRepo.findById(req.assigneeId)
+                } else if (!Objects.equals(oldAssigneeId, newId)) {
+                    newAssignee = userRepo.findById(newId)
                             .orElseThrow(() -> new IllegalArgumentException("assigneeId not found"));
-                    diffs.add("assigneeId: " + (oldId == null ? null : oldId) + " -> " + u.getId());
-                    t.setAssignee(u);
+                    diffs.add("assigneeId: " + (oldAssigneeId == null ? null : oldAssigneeId) + " -> " + newAssignee.getId());
+                    t.setAssignee(newAssignee);
+                    assignmentChanged = true; // nouvelle assignation / changement
                 }
             } else if (req.assigneeEmail != null) {
-                UUID oldId = t.getAssignee() != null ? t.getAssignee().getId() : null;
-                if (req.assigneeEmail.isBlank()) {
-                    if (oldId != null) {
-                        diffs.add("assigneeEmail: " + oldId + " -> null");
+                String email = req.assigneeEmail.trim();
+                if (email.isBlank()) {
+                    if (oldAssigneeId != null) {
+                        diffs.add("assigneeEmail: " + oldAssigneeId + " -> null");
                         t.setAssignee(null);
+                        assignmentChanged = true; // désassignation
                     }
                 } else {
-                    var u = userRepo.findByEmail(req.assigneeEmail.trim())
+                    newAssignee = userRepo.findByEmail(email)
                             .orElseThrow(() -> new IllegalArgumentException("assigneeEmail not found"));
-                    if (!Objects.equals(oldId, u.getId())) {
-                        diffs.add("assigneeEmail: " + (oldId == null ? null : oldId) + " -> " + u.getId());
-                        t.setAssignee(u);
+                    if (!Objects.equals(oldAssigneeId, newAssignee.getId())) {
+                        diffs.add("assigneeEmail: " + (oldAssigneeId == null ? null : oldAssigneeId) + " -> " + newAssignee.getId());
+                        t.setAssignee(newAssignee);
+                        assignmentChanged = true;
                     }
                 }
             }
@@ -277,6 +345,11 @@ public class TaskController {
                 Task saved = taskRepo.save(t);
                 String log = "UPDATED: " + String.join("; ", diffs);
                 saveHistory(saved, changer, log);
+
+                // Notification seulement si l'assignation a changé ET qu'il y a un nouvel assignee
+                if (assignmentChanged && saved.getAssignee() != null) {
+                    safeSendAssignmentMail(saved.getAssignee(), saved, changer);
+                }
                 return ResponseEntity.ok(toDto(saved));
             } else {
                 return ResponseEntity.ok(toDto(t));

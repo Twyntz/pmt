@@ -1,37 +1,32 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
+import { FormBuilder, Validators, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { HttpClientModule } from '@angular/common/http';
-import { TaskPriority, TaskService, TaskStatus } from '../../../services/task.service';
-import { AuthService } from '../../../services/auth.service';
+import { TaskService, TaskPayload } from '../../../services/task.service';
 import { ProjectService } from '../../../services/project.service';
+import { AuthService } from '../../../services/auth.service';
 
 @Component({
   selector: 'app-task-create',
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, RouterModule, HttpClientModule],
-  templateUrl: './task-create.component.html',
-  styleUrl: './task-create.component.scss'
+  templateUrl: './task-create.component.html'
 })
 export class TaskCreateComponent implements OnInit {
   projectId = '';
-  loading = false;
-  error: string | null = null;
-
-  // membres du projet pour le select
-  members: Array<{ id: string; username: string; email: string }> = [];
-  loadingMembers = false;
-  loadMembersError: string | null = null;
+  members: Array<{ email: string; username?: string }> = [];
+  submitting = false;
+  serverError: string | null = null;
 
   form = this.fb.group({
     title: ['', [Validators.required, Validators.minLength(3)]],
     description: [''],
-    status: ['TODO' as TaskStatus],
-    priority: ['MEDIUM' as TaskPriority],
+    status: ['IN_PROGRESS'],
+    priority: ['MEDIUM'],
     deadline: [''],
     endDate: [''],
-    assigneeId: [''] // <= select sur l'id du membre
+    assigneeEmail: ['']   // on enverra l'email (ou vide)
   });
 
   constructor(
@@ -39,65 +34,63 @@ export class TaskCreateComponent implements OnInit {
     private route: ActivatedRoute,
     private router: Router,
     private tasks: TaskService,
-    private auth: AuthService,
-    private projects: ProjectService
+    private projects: ProjectService,
+    private auth: AuthService
   ) {}
 
   ngOnInit(): void {
-    if (!this.auth.isLoggedIn()) { this.router.navigateByUrl('/login'); return; }
     this.projectId = this.route.snapshot.paramMap.get('id') || '';
-    if (!this.projectId) { this.router.navigateByUrl('/projects'); return; }
-
-    this.fetchMembers();
+    this.loadMembers();
   }
 
-  private fetchMembers(): void {
-    this.loadingMembers = true; this.loadMembersError = null;
+  private loadMembers(): void {
     this.projects.getMembers(this.projectId).subscribe({
-      next: (list: any[]) => {
-        this.loadingMembers = false;
-        // normalise un peu les données attendues par l’UI
-        this.members = (list || []).map(m => ({
-          id: m.id ?? m.userId ?? m.memberId ?? '',
-          username: m.username ?? '',
-          email: m.email ?? ''
-        })).filter(m => !!m.id);
+      next: (list) => {
+        this.members = (Array.isArray(list) ? list : [])
+          .map((m: any) => ({ email: m.email || '', username: m.username || '' }))
+          .filter(m => !!m.email);
       },
-      error: (e) => {
-        this.loadingMembers = false;
-        this.loadMembersError = e?.error?.error || e?.message || 'Impossible de charger les membres';
-        this.members = [];
-      }
+      error: () => { this.members = []; }
     });
+  }
+
+  private toYYYYMMDD(d?: string | null): string | undefined {
+    if (!d) return undefined;
+    const parts = d.split('-');
+    return parts.length === 3 ? `${parts[0]}-${parts[1]}-${parts[2]}` : undefined;
   }
 
   submit(): void {
+    this.serverError = null;
     if (this.form.invalid) { this.form.markAllAsTouched(); return; }
-    this.loading = true; this.error = null;
 
-    const payload = {
-      title: this.form.controls.title.value ?? '',
-      description: this.form.controls.description.value ?? '',
-      status: (this.form.controls.status.value || 'TODO') as TaskStatus,
-      priority: (this.form.controls.priority.value || 'MEDIUM') as TaskPriority,
-      deadline: this.form.controls.deadline.value ?? '',
-      endDate: this.form.controls.endDate.value ?? '',
-      assigneeId: (this.form.controls.assigneeId.value || '') || null, // null si rien choisi
-      // assigneeEmail non utilisé ici, on passe par l'ID
+    const current = this.auth.getCurrentUser();
+    const currentUserId = current?.id || undefined;
+
+    const v = this.form.value;
+    const payload: TaskPayload = {
+      title: v.title || '',
+      description: v.description || undefined,
+      status: (v.status as any) || 'IN_PROGRESS',
+      priority: (v.priority as any) || 'MEDIUM',
+      deadline: this.toYYYYMMDD(v.deadline || undefined),
+      endDate: this.toYYYYMMDD(v.endDate || undefined),
+      assigneeId: null,                             // on n’utilise pas l’UUID ici
+      assigneeEmail: v.assigneeEmail ? String(v.assigneeEmail) : null,
+      changedBy: currentUserId ? String(currentUserId) : null
     };
 
+    this.submitting = true;
     this.tasks.create(this.projectId, payload).subscribe({
-      next: () => {
-        this.loading = false;
-        this.router.navigateByUrl(`/projects/${this.projectId}`);
+      next: (t) => {
+        this.submitting = false;
+        this.router.navigate(['/projects', this.projectId, 'tasks', t?.id]);
       },
       error: (e) => {
-        this.loading = false;
-        const msg = e?.error?.error || e?.error?.details || e?.message || 'Erreur inconnue';
-        this.error = 'Impossible de créer la tâche : ' + msg;
+        this.submitting = false;
+        const msg = e?.error?.details || e?.error?.error || e?.message || 'Erreur inconnue';
+        this.serverError = msg;
       }
     });
   }
-
-  get titleCtrl() { return this.form.controls.title; }
 }

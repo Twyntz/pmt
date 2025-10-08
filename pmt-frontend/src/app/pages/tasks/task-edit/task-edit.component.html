@@ -1,31 +1,26 @@
-<div class="max-w-xl mx-auto p-6 border rounded">
-  <a [routerLink]="['/projects', projectId]" class="text-sm underline text-gray-600">← Retour au projet</a>
-  <h1 class="text-2xl font-semibold mb-4 mt-2">Modifier la tâche</h1>
+<a [routerLink]="['/projects', projectId]" class="text-sm underline text-gray-600">← Retour au projet</a>
 
-  <div *ngIf="loadingTask" class="text-gray-600">Chargement…</div>
-  <div *ngIf="loadError" class="text-red-700 bg-red-50 border border-red-200 rounded p-2 mb-3">{{ loadError }}</div>
+<div class="max-w-2xl mt-4">
+  <h1 class="text-2xl font-semibold mb-4">Modifier la tâche</h1>
 
-  <form [formGroup]="form" (ngSubmit)="submit()" class="space-y-4" *ngIf="!loadingTask && !loadError">
+  <form [formGroup]="form" (ngSubmit)="submit()" class="grid gap-4">
     <div>
       <label class="block text-sm font-medium mb-1">Titre</label>
-      <input type="text" class="w-full border rounded p-2" formControlName="title" />
-      <div class="text-red-600 text-sm mt-1" *ngIf="titleCtrl.touched && titleCtrl.invalid">
-        Titre requis (min 3 caractères).
-      </div>
+      <input class="w-full border rounded p-2" formControlName="title" />
     </div>
 
     <div>
       <label class="block text-sm font-medium mb-1">Description</label>
-      <textarea rows="3" class="w-full border rounded p-2" formControlName="description"></textarea>
+      <textarea class="w-full border rounded p-2" rows="4" formControlName="description"></textarea>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div class="grid grid-cols-2 gap-4">
       <div>
         <label class="block text-sm font-medium mb-1">Statut</label>
         <select class="w-full border rounded p-2" formControlName="status">
           <option value="TODO">À faire</option>
           <option value="IN_PROGRESS">En cours</option>
-          <option value="DONE">Terminé</option>
+          <option value="DONE">Terminée</option>
         </select>
       </div>
       <div>
@@ -38,7 +33,7 @@
       </div>
     </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div class="grid grid-cols-2 gap-4">
       <div>
         <label class="block text-sm font-medium mb-1">Échéance</label>
         <input type="date" class="w-full border rounded p-2" formControlName="deadline" />
@@ -51,23 +46,20 @@
 
     <div>
       <label class="block text-sm font-medium mb-1">Assignée à</label>
-      <div *ngIf="loadingMembers" class="text-gray-600 text-sm">Chargement des membres…</div>
-      <div *ngIf="loadMembersError" class="text-red-700 bg-red-50 border border-red-200 rounded p-2 mb-2">
-        {{ loadMembersError }}
-      </div>
-      <select class="w-full border rounded p-2" formControlName="assigneeId" [disabled]="loadingMembers || !!loadMembersError">
-        <option value="">— Non assignée —</option>
-        <option *ngFor="let m of members" [value]="m.id">
-          {{ m.username || m.email }} <span *ngIf="m.username && m.email">({{ m.email }})</span>
+      <select class="w-full border rounded p-2" formControlName="assigneeEmail" (change)="assigneeChanged = true">
+        <option value="">— (personne)</option>
+        <option *ngFor="let m of members" [value]="m.email">
+          {{ m.username || m.email }} <ng-container *ngIf="m.email && m.username">({{ m.email }})</ng-container>
         </option>
       </select>
+      <p class="text-xs text-gray-500 mt-1">Choisir « personne » pour désassigner.</p>
+      <p *ngIf="serverError" class="text-sm text-red-700 mt-2">{{ serverError }}</p>
     </div>
 
-    <button type="submit" class="px-4 py-2 rounded bg-black text-white disabled:opacity-50"
-            [disabled]="loading || form.invalid">
-      {{ loading ? 'Mise à jour…' : 'Enregistrer' }}
-    </button>
-
-    <div *ngIf="error" class="text-red-700 bg-red-50 border border-red-200 rounded p-2 mt-2">{{ error }}</div>
+    <div class="pt-2">
+      <button class="px-4 py-2 rounded bg-black text-white disabled:opacity-50" [disabled]="form.invalid || submitting">
+        {{ submitting ? 'Enregistrement…' : 'Enregistrer' }}
+      </button>
+    </div>
   </form>
 </div>

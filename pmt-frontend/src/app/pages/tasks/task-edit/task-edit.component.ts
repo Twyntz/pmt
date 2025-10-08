@@ -1,40 +1,35 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
+import { FormBuilder, Validators, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { HttpClientModule } from '@angular/common/http';
-import { TaskPriority, TaskService, TaskStatus } from '../../../services/task.service';
-import { AuthService } from '../../../services/auth.service';
+import { TaskService } from '../../../services/task.service';
 import { ProjectService } from '../../../services/project.service';
+import { AuthService } from '../../../services/auth.service';
+
 @Component({
   selector: 'app-task-edit',
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, RouterModule, HttpClientModule],
-  templateUrl: './task-edit.component.html',
-  styleUrl: './task-edit.component.scss'
+  templateUrl: './task-edit.component.html'
 })
 export class TaskEditComponent implements OnInit {
   projectId = '';
   taskId = '';
+  members: Array<{ email: string; username?: string }> = [];
+  submitting = false;
+  serverError: string | null = null;
 
-  loading = false;
-  loadingTask = false;
-  error: string | null = null;
-  loadError: string | null = null;
-
-  // membres pour l'assignation
-  members: Array<{ id: string; username: string; email: string }> = [];
-  loadingMembers = false;
-  loadMembersError: string | null = null;
+  assigneeChanged = false;
 
   form = this.fb.group({
     title: ['', [Validators.required, Validators.minLength(3)]],
     description: [''],
-    status: ['TODO' as TaskStatus],
-    priority: ['MEDIUM' as TaskPriority],
+    status: ['IN_PROGRESS'],
+    priority: ['MEDIUM'],
     deadline: [''],
     endDate: [''],
-    assigneeId: ['']
+    assigneeEmail: [''] // email ou '' pour désassigner
   });
 
   constructor(
@@ -42,87 +37,101 @@ export class TaskEditComponent implements OnInit {
     private route: ActivatedRoute,
     private router: Router,
     private tasks: TaskService,
-    private auth: AuthService,
-    private projects: ProjectService
+    private projects: ProjectService,
+    private auth: AuthService
   ) {}
 
   ngOnInit(): void {
-    if (!this.auth.isLoggedIn()) { this.router.navigateByUrl('/login'); return; }
     this.projectId = this.route.snapshot.paramMap.get('id') || '';
     this.taskId = this.route.snapshot.paramMap.get('taskId') || '';
-    if (!this.projectId || !this.taskId) { this.router.navigateByUrl('/projects'); return; }
-
-    this.fetchMembers();
+    this.loadMembers();
     this.loadTask();
   }
 
-  private fetchMembers(): void {
-    this.loadingMembers = true; this.loadMembersError = null;
+  private loadMembers(): void {
     this.projects.getMembers(this.projectId).subscribe({
-      next: (list: any[]) => {
-        this.loadingMembers = false;
-        this.members = (list || []).map(m => ({
-          id: m.id ?? m.userId ?? m.memberId ?? '',
-          username: m.username ?? '',
-          email: m.email ?? ''
-        })).filter(m => !!m.id);
+      next: (list) => {
+        this.members = (Array.isArray(list) ? list : [])
+          .map((m: any) => ({ email: m.email || '', username: m.username || '' }))
+          .filter(m => !!m.email);
       },
-      error: (e) => {
-        this.loadingMembers = false;
-        this.loadMembersError = e?.error?.error || e?.message || 'Impossible de charger les membres';
-        this.members = [];
-      }
+      error: () => { this.members = []; }
     });
+  }
+
+  private toInputDate(d?: string | null): string {
+    if (!d) return '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+    const dt = new Date(d);
+    if (isNaN(+dt)) return '';
+    const yyyy = dt.getFullYear();
+    const mm = String(dt.getMonth() + 1).padStart(2, '0');
+    const dd = String(dt.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
   }
 
   private loadTask(): void {
-    this.loadingTask = true; this.loadError = null;
     this.tasks.get(this.projectId, this.taskId).subscribe({
-      next: (t: any) => {
-        this.loadingTask = false;
-        this.form.patchValue({
-          title: t.title ?? '',
-          description: t.description ?? '',
-          status: (t.status || 'TODO') as TaskStatus,
-          priority: (t.priority || 'MEDIUM') as TaskPriority,
-          deadline: t.deadline || '',
-          endDate: t.endDate || '',
-          assigneeId: t.assigneeId || ''
-        });
+      next: (t) => {
+        this.form.reset({
+          title: t?.title || '',
+          description: t?.description || '',
+          status: t?.status || 'IN_PROGRESS',
+          priority: t?.priority || 'MEDIUM',
+          deadline: this.toInputDate(t?.deadline),
+          endDate: this.toInputDate(t?.endDate),
+          assigneeEmail: t?.assigneeEmail || ''
+        }, { emitEvent: false });
+        this.assigneeChanged = false;
       },
       error: (e) => {
-        this.loadingTask = false;
-        this.loadError = e?.error?.error || e?.message || 'Impossible de charger la tâche';
+        this.serverError = e?.error?.error || e?.message || 'Erreur chargement';
       }
     });
+  }
+
+  private toYYYYMMDD(d?: string | null): string | undefined {
+    if (!d) return undefined;
+    const parts = d.split('-');
+    return parts.length === 3 ? `${parts[0]}-${parts[1]}-${parts[2]}` : undefined;
   }
 
   submit(): void {
+    this.serverError = null;
     if (this.form.invalid) { this.form.markAllAsTouched(); return; }
-    this.loading = true; this.error = null;
+
+    const current = this.auth.getCurrentUser();
+    const currentUserId = current?.id || undefined;
+
+    const v = this.form.value;
+
+    // On n’envoie l’assignation que si l’utilisateur a modifié le champ.
+    const assignPart = this.assigneeChanged
+      ? { assigneeEmail: v.assigneeEmail ? String(v.assigneeEmail) : '' } // '' => désassigner
+      : {};
 
     const payload = {
-      title: this.form.controls.title.value ?? '',
-      description: this.form.controls.description.value ?? '',
-      status: (this.form.controls.status.value || 'TODO') as TaskStatus,
-      priority: (this.form.controls.priority.value || 'MEDIUM') as TaskPriority,
-      deadline: this.form.controls.deadline.value ?? '',
-      endDate: this.form.controls.endDate.value ?? '',
-      assigneeId: (this.form.controls.assigneeId.value || '') || null
+      title: v.title || undefined,
+      description: v.description ?? undefined,
+      status: (v.status as any) || undefined,
+      priority: (v.priority as any) || undefined,
+      deadline: this.toYYYYMMDD(v.deadline || undefined),
+      endDate: this.toYYYYMMDD(v.endDate || undefined),
+      changedBy: currentUserId ? String(currentUserId) : null,
+      ...assignPart
     };
 
+    this.submitting = true;
     this.tasks.update(this.projectId, this.taskId, payload).subscribe({
       next: () => {
-        this.loading = false;
-        this.router.navigateByUrl(`/projects/${this.projectId}`);
+        this.submitting = false;
+        this.router.navigate(['/projects', this.projectId, 'tasks', this.taskId]);
       },
       error: (e) => {
-        this.loading = false;
-        const msg = e?.error?.error || e?.error?.details || e?.message || 'Erreur inconnue';
-        this.error = 'Impossible de mettre à jour la tâche : ' + msg;
+        this.submitting = false;
+        const msg = e?.error?.details || e?.error?.error || e?.message || 'Erreur inconnue';
+        this.serverError = msg;
       }
     });
   }
-
-  get titleCtrl() { return this.form.controls.title; }
 }
