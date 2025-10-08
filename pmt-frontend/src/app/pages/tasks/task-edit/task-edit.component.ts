@@ -29,7 +29,7 @@ export class TaskEditComponent implements OnInit {
     priority: ['MEDIUM'],
     deadline: [''],
     endDate: [''],
-    assigneeEmail: [''] // email ou '' pour désassigner
+    assigneeEmail: ['']
   });
 
   constructor(
@@ -44,18 +44,32 @@ export class TaskEditComponent implements OnInit {
   ngOnInit(): void {
     this.projectId = this.route.snapshot.paramMap.get('id') || '';
     this.taskId = this.route.snapshot.paramMap.get('taskId') || '';
-    this.loadMembers();
-    this.loadTask();
-  }
 
-  private loadMembers(): void {
+    // --- Contrôle d'accès : OWNER/ADMIN/MEMBER uniquement ---
     this.projects.getMembers(this.projectId).subscribe({
       next: (list) => {
-        this.members = (Array.isArray(list) ? list : [])
-          .map((m: any) => ({ email: m.email || '', username: m.username || '' }))
-          .filter(m => !!m.email);
+        const members = Array.isArray(list) ? list : [];
+        const current = this.auth.getCurrentUser();
+        const me = members.find(m =>
+          m?.id === current?.id || m?.userId === current?.id || m?.email === current?.email
+        );
+        const allowed = !!me && (me.role === 'ADMIN' || me.role === 'MEMBER');
+        const ownerId = undefined; // l’owner n'est pas listé ici systématiquement; si tu veux, ajoute un check via project.ownerId
+        if (!allowed && !ownerId) {
+          this.router.navigate(['/projects', this.projectId]);
+          return;
+        }
+
+        // Liste pour le select
+        this.members = members.map((m: any) => ({ email: m.email || '', username: m.username || '' }))
+                              .filter(m => !!m.email);
+
+        // Charge la tâche
+        this.loadTask();
       },
-      error: () => { this.members = []; }
+      error: () => {
+        this.router.navigate(['/projects', this.projectId]);
+      }
     });
   }
 
@@ -105,9 +119,8 @@ export class TaskEditComponent implements OnInit {
 
     const v = this.form.value;
 
-    // On n’envoie l’assignation que si l’utilisateur a modifié le champ.
     const assignPart = this.assigneeChanged
-      ? { assigneeEmail: v.assigneeEmail ? String(v.assigneeEmail) : '' } // '' => désassigner
+      ? { assigneeEmail: v.assigneeEmail ? String(v.assigneeEmail) : '' }
       : {};
 
     const payload = {

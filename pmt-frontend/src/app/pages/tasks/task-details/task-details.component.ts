@@ -2,8 +2,9 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { HttpClientModule } from '@angular/common/http';
-import { AuthService } from '../../../services/auth.service';
 import { TaskService } from '../../../services/task.service';
+import { ProjectService } from '../../../services/project.service';
+import { AuthService } from '../../../services/auth.service';
 
 @Component({
   selector: 'app-task-details',
@@ -16,27 +17,29 @@ export class TaskDetailsComponent implements OnInit {
   projectId = '';
   taskId = '';
 
+  task: any = null;
   loading = false;
   error: string | null = null;
-  task: any = null;
+
+  // Pour le contrôle d’accès
+  members: any[] = [];
+  membersLoaded = false;
 
   constructor(
     private route: ActivatedRoute,
     private router: Router,
-    private auth: AuthService,
-    private tasks: TaskService
+    private tasks: TaskService,
+    private projects: ProjectService,
+    private auth: AuthService
   ) {}
 
   ngOnInit(): void {
-    if (!this.auth.isLoggedIn()) {
-      this.router.navigateByUrl('/login'); return;
-    }
     this.projectId = this.route.snapshot.paramMap.get('id') || '';
     this.taskId = this.route.snapshot.paramMap.get('taskId') || '';
-    if (!this.projectId || !this.taskId) {
-      this.router.navigateByUrl('/projects'); return;
-    }
+
+    // Charger la tâche + les membres du projet (pour savoir si on peut éditer)
     this.load();
+    this.loadMembers();
   }
 
   load(): void {
@@ -50,13 +53,27 @@ export class TaskDetailsComponent implements OnInit {
     });
   }
 
-  goBack(): void {
-    this.router.navigateByUrl(`/projects/${this.projectId}`);
+  loadMembers(): void {
+    this.membersLoaded = false;
+    this.projects.getMembers(this.projectId).subscribe({
+      next: (list) => { this.members = Array.isArray(list) ? list : []; this.membersLoaded = true; },
+      error: () => { this.members = []; this.membersLoaded = true; }
+    });
   }
 
-  canEdit(): boolean {
-    // Simple: toute personne connectée voit, mais on réserve l’édition aux non-viewers si tu gères les rôles côté front.
-    // Ici on retourne true par défaut; adapte si tu ajoutes un rôle utilisateur dans le localStorage.
-    return true;
+  /** OWNER, ADMIN, MEMBER => peuvent modifier */
+  isMemberOrAbove(): boolean {
+    const current = this.auth.getCurrentUser();
+    if (!current) return false;
+
+    // Owner
+    const ownerId = this.task?.projectOwnerId || this.task?.project?.ownerId || this.task?.project?.owner?.id;
+    if (ownerId && ownerId === current.id) return true;
+
+    // Cherche le rôle du user dans les membres
+    const me = (this.members || []).find(m =>
+      m?.id === current.id || m?.userId === current.id || m?.email === current.email
+    );
+    return me?.role === 'ADMIN' || me?.role === 'MEMBER';
   }
 }

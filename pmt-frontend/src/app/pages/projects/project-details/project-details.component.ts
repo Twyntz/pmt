@@ -18,8 +18,7 @@ export class ProjectDetailsComponent implements OnInit {
   projectId = '';
   project: any = null;
 
-  // NEW: affichage owner
-  ownerName = '';     // username ou email
+  ownerName = '';
   ownerError: string | null = null;
 
   members: any[] = [];
@@ -65,17 +64,11 @@ export class ProjectDetailsComponent implements OnInit {
       next: (p) => {
         this.loadingProject = false;
         this.project = p;
-        // Résoudre le nom du propriétaire si on a un ownerId
         const ownerId = p?.ownerId || p?.owner_id || p?.owner?.id;
         if (ownerId) {
           this.projects.getUserById(ownerId).subscribe({
-            next: (u) => {
-              this.ownerName = u?.username || u?.email || '';
-            },
-            error: () => {
-              this.ownerName = '';
-              this.ownerError = 'Impossible de récupérer le propriétaire';
-            }
+            next: (u) => { this.ownerName = u?.username || u?.email || ''; },
+            error: () => { this.ownerName = ''; this.ownerError = 'Impossible de récupérer le propriétaire'; }
           });
         } else {
           this.ownerName = p?.owner?.username || p?.owner?.email || '';
@@ -126,8 +119,27 @@ export class ProjectDetailsComponent implements OnInit {
     });
   }
 
-  isOwner(): boolean {
+  /** OWNER ou ADMIN peuvent inviter */
+  canInvite(): boolean {
     const current = this.auth.getCurrentUser();
-    return !!(current && this.project && (this.project.ownerId === current.id || this.project.owner?.id === current.id));
+    if (!current || !this.project) return false;
+    const ownerId = this.project.ownerId || this.project.owner?.id;
+    if (ownerId && ownerId === current.id) return true;
+    const me = (this.members || []).find(m =>
+      m?.id === current.id || m?.userId === current.id || m?.email === current.email
+    );
+    return me?.role === 'ADMIN';
+  }
+
+  /** OWNER, ADMIN, MEMBER => peuvent créer/modifier */
+  isMemberOrAbove(): boolean {
+    const current = this.auth.getCurrentUser();
+    if (!current || !this.project) return false;
+    const ownerId = this.project.ownerId || this.project.owner?.id;
+    if (ownerId && ownerId === current.id) return true;
+    const me = (this.members || []).find(m =>
+      m?.id === current.id || m?.userId === current.id || m?.email === current.email
+    );
+    return me?.role === 'ADMIN' || me?.role === 'MEMBER';
   }
 }

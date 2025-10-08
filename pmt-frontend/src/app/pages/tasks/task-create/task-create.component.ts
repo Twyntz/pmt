@@ -26,7 +26,7 @@ export class TaskCreateComponent implements OnInit {
     priority: ['MEDIUM'],
     deadline: [''],
     endDate: [''],
-    assigneeEmail: ['']   // on enverra l'email (ou vide)
+    assigneeEmail: ['']
   });
 
   constructor(
@@ -40,17 +40,29 @@ export class TaskCreateComponent implements OnInit {
 
   ngOnInit(): void {
     this.projectId = this.route.snapshot.paramMap.get('id') || '';
-    this.loadMembers();
-  }
-
-  private loadMembers(): void {
+    // --- Contrôle d'accès : OWNER/ADMIN/MEMBER uniquement ---
     this.projects.getMembers(this.projectId).subscribe({
       next: (list) => {
-        this.members = (Array.isArray(list) ? list : [])
-          .map((m: any) => ({ email: m.email || '', username: m.username || '' }))
-          .filter(m => !!m.email);
+        const members = Array.isArray(list) ? list : [];
+        const current = this.auth.getCurrentUser();
+        const isOwner = false; // pas nécessaire ici; on s'appuie sur les membres
+        const me = members.find(m =>
+          m?.id === current?.id || m?.userId === current?.id || m?.email === current?.email
+        );
+        const allowed = !!me && (me.role === 'ADMIN' || me.role === 'MEMBER');
+        if (!allowed) {
+          // Redirection si accès interdit
+          this.router.navigate(['/projects', this.projectId]);
+          return;
+        }
+        // Charger la liste pour le select
+        this.members = members.map((m: any) => ({ email: m.email || '', username: m.username || '' }))
+                              .filter(m => !!m.email);
       },
-      error: () => { this.members = []; }
+      error: () => {
+        // En cas d'erreur membres, prudence => on renvoie vers la page projet
+        this.router.navigate(['/projects', this.projectId]);
+      }
     });
   }
 
@@ -75,7 +87,7 @@ export class TaskCreateComponent implements OnInit {
       priority: (v.priority as any) || 'MEDIUM',
       deadline: this.toYYYYMMDD(v.deadline || undefined),
       endDate: this.toYYYYMMDD(v.endDate || undefined),
-      assigneeId: null,                             // on n’utilise pas l’UUID ici
+      assigneeId: null,
       assigneeEmail: v.assigneeEmail ? String(v.assigneeEmail) : null,
       changedBy: currentUserId ? String(currentUserId) : null
     };

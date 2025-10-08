@@ -1,75 +1,76 @@
-<div class="max-w-3xl mx-auto p-6 border rounded">
-  <div class="flex items-center justify-between">
-    <button class="text-sm underline" (click)="goBack()">← Retour au projet</button>
-    <button class="text-sm underline" (click)="load()">Rafraîchir</button>
+<div class="max-w-5xl mx-auto p-6">
+  <a [routerLink]="['/projects', projectId]" class="text-sm underline text-gray-600">← Retour au projet</a>
+
+  <div class="flex items-center justify-between mt-2">
+    <h1 class="text-2xl font-semibold">Détails de la tâche</h1>
+    <a class="text-sm underline" (click)="load()">Rafraîchir</a>
   </div>
 
-  <h1 class="text-2xl font-semibold mt-2">Détails de la tâche</h1>
+  <div *ngIf="loading" class="mt-3 text-gray-600">Chargement…</div>
+  <div *ngIf="error" class="mt-3 text-red-700 bg-red-50 border border-red-200 p-2 rounded">
+    {{ error }}
+  </div>
 
-  <div *ngIf="loading" class="mt-2 text-gray-600">Chargement…</div>
-  <div *ngIf="error" class="mt-2 text-red-700 bg-red-50 border border-red-200 p-2 rounded">{{ error }}</div>
+  <div *ngIf="task && !loading" class="mt-4 grid gap-6 md:grid-cols-2 border rounded p-4">
+    <div>
+      <div class="text-sm text-gray-500">Titre</div>
+      <div class="text-lg font-medium">{{ task.title }}</div>
+    </div>
 
-  <ng-container *ngIf="task && !loading">
-    <dl class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
-      <div>
-        <dt class="text-sm text-gray-500">Titre</dt>
-        <dd class="text-base font-medium">{{ task.title }}</dd>
+    <div>
+      <div class="text-sm text-gray-500">Statut</div>
+      <div class="text-lg font-medium">{{ task.status }}</div>
+    </div>
+
+    <div>
+      <div class="text-sm text-gray-500">Priorité</div>
+      <div class="text-lg font-medium"
+           [class.text-red-600]="task.priority==='HIGH'"
+           [class.text-yellow-700]="task.priority==='MEDIUM'"
+           [class.text-gray-600]="task.priority==='LOW'">
+        {{ task.priority }}
       </div>
+    </div>
 
-      <div>
-        <dt class="text-sm text-gray-500">Statut</dt>
-        <dd class="text-base">{{ task.status }}</dd>
+    <div>
+      <div class="text-sm text-gray-500">Créée le</div>
+      <div class="text-lg font-medium">
+        {{ (task.createdAt || '').toString().replace('T',' ').slice(0,19) }}
       </div>
+    </div>
 
-      <div>
-        <dt class="text-sm text-gray-500">Priorité</dt>
-        <dd class="text-base"
-            [class]="
-              task.priority === 'HIGH' ? 'text-red-600' :
-              task.priority === 'LOW' ? 'text-gray-600' : 'text-yellow-700'
-            ">
-          {{ task.priority }}
-        </dd>
-      </div>
+    <div>
+      <div class="text-sm text-gray-500">Échéance</div>
+      <div class="text-lg font-medium">{{ task.deadline || '—' }}</div>
+    </div>
 
-      <div>
-        <dt class="text-sm text-gray-500">Créée le</dt>
-        <dd class="text-base">{{ (task.createdAt || '').toString().replace('T',' ').slice(0,19) }}</dd>
-      </div>
+    <div>
+      <div class="text-sm text-gray-500">Date de fin</div>
+      <div class="text-lg font-medium">{{ task.endDate || '—' }}</div>
+    </div>
 
-      <div>
-        <dt class="text-sm text-gray-500">Échéance</dt>
-        <dd class="text-base">{{ task.deadline || '—' }}</dd>
-      </div>
+    <div>
+      <div class="text-sm text-gray-500">Assignée à</div>
+      <div class="text-lg font-medium">{{ task.assigneeUsername || task.assigneeEmail || '—' }}</div>
+    </div>
 
-      <div>
-        <dt class="text-sm text-gray-500">Date de fin</dt>
-        <dd class="text-base">{{ task.endDate || '—' }}</dd>
-      </div>
+    <div class="md:col-span-2">
+      <div class="text-sm text-gray-500">Description</div>
+      <div class="whitespace-pre-wrap">{{ task.description || '—' }}</div>
+    </div>
 
-      <div class="sm:col-span-2">
-        <dt class="text-sm text-gray-500">Assignée à</dt>
-        <dd class="text-base">
-          {{ task.assigneeUsername || task.assigneeEmail || '—' }}
-        </dd>
-      </div>
-
-      <div class="sm:col-span-2">
-        <dt class="text-sm text-gray-500">Description</dt>
-        <dd class="text-base whitespace-pre-line">{{ task.description || '—' }}</dd>
-      </div>
-    </dl>
-
-    <div class="mt-6 flex items-center gap-3">
-      <a *ngIf="canEdit()"
+    <div class="md:col-span-2 flex items-center gap-3">
+      <!-- Masqué si l’utilisateur n’est pas OWNER/ADMIN/MEMBER -->
+      <a *ngIf="isMemberOrAbove()"
          class="px-4 py-2 rounded bg-black text-white"
-         [routerLink]="['/projects', projectId, 'tasks', task.id, 'edit']">
+         [routerLink]="['/projects', projectId, 'tasks', taskId, 'edit']">
         Modifier
       </a>
+
       <a class="px-4 py-2 rounded border hover:bg-gray-50"
-        [routerLink]="['/projects', projectId, 'tasks', task.id, 'history']">
+         [routerLink]="['/projects', projectId, 'tasks', taskId, 'history']">
         Historique
       </a>
     </div>
-  </ng-container>
+  </div>
 </div>
