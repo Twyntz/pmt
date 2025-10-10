@@ -1,0 +1,118 @@
+name: CI/CD Pipeline (compose-style)
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+env:
+  FRONT_DIR: pmt-frontend
+  BACK_DIR: pmt-backend
+  COMPOSE_FILE: docker-compose.yml
+  FRONT_CONTAINER: pmt-frontend
+  BACK_CONTAINER: pmt-backend
+  FRONT_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/pmt-frontend
+  BACK_IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/pmt-backend
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Verify Docker installation
+        run: docker --version
+
+      - name: Build and start Docker Compose services
+        run: docker compose -f $COMPOSE_FILE up --build -d
+
+      - name: Verify Docker containers status
+        run: docker ps
+
+      - name: Run frontend unit tests with coverage (Node container)
+        run: |
+          docker run --rm \
+            -v "${PWD}:/app" \
+            -w /app/$FRONT_DIR \
+            --entrypoint bash node:18 \
+            -lc "apt-get update && apt-get install -y chromium && \
+                 npm ci && \
+                 CHROME_BIN=/usr/bin/chromium npx ng test --watch=false --code-coverage --browsers=ChromeHeadless"
+
+      - name: Upload frontend coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: ${{ env.FRONT_DIR }}/coverage/
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Run backend tests with Maven (JaCoCo)
+        run: |
+          docker run --rm \
+            -v "${PWD}:/app" \
+            -w /app/$BACK_DIR \
+            -e SPRING_PROFILES_ACTIVE=test \
+            maven:3.9.6-eclipse-temurin-17 \
+            mvn -B clean verify
+
+      - name: Upload backend JaCoCo report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-jacoco
+          path: ${{ env.BACK_DIR }}/target/site/jacoco/
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Shut down Docker Compose
+        if: always()
+        run: docker compose -f $COMPOSE_FILE down
+
+  deployment-on-docker-hub:
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    if: github.event_name == 'push'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push frontend Docker image
+        run: |
+          docker build -t $FRONT_IMAGE:${{ github.sha }} -t $FRONT_IMAGE:latest $FRONT_DIR
+          docker push $FRONT_IMAGE:${{ github.sha }}
+          docker push $FRONT_IMAGE:latest
+
+      - name: Build and push backend Docker image
+        run: |
+          docker build -t $BACK_IMAGE:${{ github.sha }} -t $BACK_IMAGE:latest $BACK_DIR
+          docker push $BACK_IMAGE:${{ github.sha }}
+          docker push $BACK_IMAGE:latest
+
+  summary:
+    runs-on: ubuntu-latest
+    needs: [deployment-on-docker-hub]
+    if: always()
+    steps:
+      - name: Summary
+        run: |
+          echo "## CI/CD Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Artifacts:" >> $GITHUB_STEP_SUMMARY
+          echo "- Frontend coverage: **frontend-coverage**" >> $GITHUB_STEP_SUMMARY
+          echo "- Backend coverage (JaCoCo): **backend-jacoco**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Docker Hub images pushed:" >> $GITHUB_STEP_SUMMARY
+          echo "- Frontend: ${{ env.FRONT_IMAGE }}:${{ github.sha }} and :latest" >> $GITHUB_STEP_SUMMARY
+          echo "- Backend:  ${{ env.BACK_IMAGE }}:${{ github.sha }} and :latest" >> $GITHUB_STEP_SUMMARY
