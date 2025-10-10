@@ -131,8 +131,8 @@ Dans **Settings → Secrets and variables → Actions** :
 - `DOCKERHUB_TOKEN` (Access Token Docker Hub)
 
 ### Images Docker Hub (exemple)
-- Frontend : `docker.io/<votre-namespace>/pmt-frontend:latest`
-- Backend : `docker.io/<votre-namespace>/pmt-backend:latest`
+- Frontend : `https://hub.docker.com/r/twyntz/pmt-frontend:latest`
+- Backend : `https://hub.docker.com/r/twyntz/pmt-backend:latest`
 
 ---
 
