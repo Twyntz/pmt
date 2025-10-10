@@ -137,50 +137,17 @@ public class TaskController {
         historyRepo.save(h);
     }
 
-    // ===== Utilities: e-mail content =====
-    private String buildTaskAssignedSubject(Task task) {
-        return "[PMT] Nouvelle tâche assignée: " + task.getTitle();
-    }
-
-    private String buildTaskAssignedBody(Task task, @Nullable User changer) {
-        String front = mailService.getFrontendUrl();
-        String link = String.format("%s/projects/%s/tasks/%s",
-                front,
-                task.getProject().getId(),
-                task.getId()
-        );
-        String by = (changer != null)
-                ? (changer.getUsername() != null ? changer.getUsername() : changer.getEmail())
-                : "Système";
-
-        StringBuilder sb = new StringBuilder();
-        sb.append("Bonjour,\n\n");
-        sb.append("Une tâche vient de vous être assignée.\n\n");
-        sb.append("Titre      : ").append(task.getTitle()).append("\n");
-        sb.append("Projet     : ").append(task.getProject().getName()).append("\n");
-        sb.append("Statut     : ").append(task.getStatus().name()).append("\n");
-        sb.append("Priorité   : ").append(task.getPriority().name()).append("\n");
-        if (task.getDeadline() != null) sb.append("Échéance   : ").append(task.getDeadline()).append("\n");
-        if (task.getEndDate() != null) sb.append("Fin        : ").append(task.getEndDate()).append("\n");
-        sb.append("Assignée par : ").append(by).append("\n");
-        sb.append("\nDétails : ").append(link).append("\n");
-        sb.append("\n--\nPMT");
-        return sb.toString();
-    }
-
     private void safeSendAssignmentMail(@Nullable User to, Task task, @Nullable User changer) {
         try {
             if (to != null && to.getEmail() != null && !to.getEmail().isBlank()) {
-                mailService.sendText(
-                        to.getEmail(),
-                        buildTaskAssignedSubject(task),
-                        buildTaskAssignedBody(task, changer),
-                        null
-                );
+                final String changerDisplay = changer != null
+                        ? (changer.getUsername() != null ? changer.getUsername() : changer.getEmail())
+                        : "Système";
+                // Compatible avec les tests qui stubbaient sendTaskAssignedMail(...),
+                // mais ne casse pas si on mock seulement sendText(...)
+                mailService.sendTaskAssignedMail(to, task, changerDisplay);
             }
-        } catch (Exception e) {
-            // On ne bloque pas la requête si l'envoi échoue
-        }
+        } catch (Exception ignored) { }
     }
 
     // ===== CREATE
@@ -218,7 +185,6 @@ public class TaskController {
             Task saved = taskRepo.save(t);
 
             User changer = (req.changedBy != null) ? userRepo.findById(req.changedBy).orElse(null) : null;
-            // Historique
             StringBuilder log = new StringBuilder("CREATED");
             log.append(": title='").append(saved.getTitle()).append("'");
             if (saved.getDescription() != null) log.append("; description='").append(saved.getDescription()).append("'");
@@ -229,7 +195,6 @@ public class TaskController {
             if (saved.getAssignee() != null) log.append("; assigneeId=").append(saved.getAssignee().getId());
             saveHistory(saved, changer, log.toString());
 
-            // Notification si la tâche est assignée à la création
             if (assignee != null) {
                 safeSendAssignmentMail(assignee, saved, changer);
             }
@@ -246,7 +211,7 @@ public class TaskController {
         }
     }
 
-    // ===== UPDATE (PATCH) — log agrégé des différences + notif si assignation change
+    // ===== UPDATE (PATCH)
     @PatchMapping("/{taskId}")
     public ResponseEntity<?> update(@PathVariable UUID projectId, @PathVariable UUID taskId, @RequestBody TaskRequest req) {
         Optional<Task> opt = taskRepo.findById(taskId);
@@ -303,7 +268,7 @@ public class TaskController {
                 }
             }
 
-            // --- Assignation (détermine si l'on doit envoyer un e-mail)
+            // --- Assignation
             User newAssignee = null;
             boolean assignmentChanged = false;
 
@@ -313,14 +278,14 @@ public class TaskController {
                     if (oldAssigneeId != null) {
                         diffs.add("assigneeId: " + oldAssigneeId + " -> null");
                         t.setAssignee(null);
-                        assignmentChanged = true; // désassignation (pas de mail)
+                        assignmentChanged = true;
                     }
                 } else if (!Objects.equals(oldAssigneeId, newId)) {
                     newAssignee = userRepo.findById(newId)
                             .orElseThrow(() -> new IllegalArgumentException("assigneeId not found"));
                     diffs.add("assigneeId: " + (oldAssigneeId == null ? null : oldAssigneeId) + " -> " + newAssignee.getId());
                     t.setAssignee(newAssignee);
-                    assignmentChanged = true; // nouvelle assignation / changement
+                    assignmentChanged = true;
                 }
             } else if (req.assigneeEmail != null) {
                 String email = req.assigneeEmail.trim();
@@ -328,7 +293,7 @@ public class TaskController {
                     if (oldAssigneeId != null) {
                         diffs.add("assigneeEmail: " + oldAssigneeId + " -> null");
                         t.setAssignee(null);
-                        assignmentChanged = true; // désassignation
+                        assignmentChanged = true;
                     }
                 } else {
                     newAssignee = userRepo.findByEmail(email)
@@ -346,7 +311,6 @@ public class TaskController {
                 String log = "UPDATED: " + String.join("; ", diffs);
                 saveHistory(saved, changer, log);
 
-                // Notification seulement si l'assignation a changé ET qu'il y a un nouvel assignee
                 if (assignmentChanged && saved.getAssignee() != null) {
                     safeSendAssignmentMail(saved.getAssignee(), saved, changer);
                 }

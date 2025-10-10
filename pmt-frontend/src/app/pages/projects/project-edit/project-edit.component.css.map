@@ -1,0 +1,9 @@
+{
+    "version": 3,
+    "mappings": "AAAA,AAAA,IAAI,CAAC;EACH,OAAO,EAAE,IAAI;EACb,cAAc,EAAE,MAAM;EACtB,GAAG,EAAE,IAAI;CACV",
+    "sources": [
+        "project-edit.component.scss"
+    ],
+    "names": [],
+    "file": "project-edit.component.css"
+}

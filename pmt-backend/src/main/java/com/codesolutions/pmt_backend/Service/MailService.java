@@ -1,5 +1,7 @@
 package com.codesolutions.pmt_backend.Service;
 
+import com.codesolutions.pmt_backend.Entity.Task;
+import com.codesolutions.pmt_backend.Entity.User;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
@@ -31,10 +33,10 @@ public class MailService {
         }
     }
 
-    public String getFrontendUrl() {
-        return frontendUrl;
-    }
+    /** Exposé pour les contrôleurs/tests. */
+    public String getFrontendUrl() { return frontendUrl; }
 
+    /** Envoi générique d'un texte. */
     public void sendText(String to, String subject, String body, @Nullable String from) {
         if (!notificationsEnabled) {
             log.info("[MAIL DISABLED] to={} subject={}", to, subject);
@@ -55,5 +57,42 @@ public class MailService {
         } catch (Exception e) {
             log.error("Échec envoi mail to={} : {}", to, e.getMessage(), e);
         }
+    }
+
+    // -------------------------------------------------------------------------
+    // Convenience methods attendues par les tests/contrôleurs
+    // -------------------------------------------------------------------------
+
+    /** Alias compatible avec certains tests : délègue à sendTaskAssignedMail(...) */
+    public void sendTaskAssigned(User to, Task task, String changerDisplay) {
+        sendTaskAssignedMail(to, task, changerDisplay);
+    }
+
+    /** Méthode simple appelée par les contrôleurs/tests. */
+    public void sendTaskAssignedMail(User to, Task task, String changerDisplay) {
+        if (to == null || to.getEmail() == null || to.getEmail().isBlank() || task == null) return;
+
+        String subject = "[PMT] Nouvelle tâche assignée: " + task.getTitle();
+        String link = String.format("%s/projects/%s/tasks/%s",
+                getFrontendUrl(),
+                task.getProject() != null ? task.getProject().getId() : null,
+                task.getId()
+        );
+
+        String body = new StringBuilder()
+                .append("Bonjour,\n\n")
+                .append("Une tâche vient de vous être assignée.\n\n")
+                .append("Titre      : ").append(task.getTitle()).append("\n")
+                .append("Projet     : ").append(task.getProject() != null ? task.getProject().getName() : "-").append("\n")
+                .append("Statut     : ").append(task.getStatus() != null ? task.getStatus().name() : "-").append("\n")
+                .append("Priorité   : ").append(task.getPriority() != null ? task.getPriority().name() : "-").append("\n")
+                .append(task.getDeadline() != null ? "Échéance   : " + task.getDeadline() + "\n" : "")
+                .append(task.getEndDate() != null ? "Fin        : " + task.getEndDate() + "\n" : "")
+                .append("Assignée par : ").append(changerDisplay != null && !changerDisplay.isBlank() ? changerDisplay : "Système").append("\n")
+                .append("\nDétails : ").append(link)
+                .append("\n\n--\nPMT")
+                .toString();
+
+        sendText(to.getEmail(), subject, body, null);
     }
 }

@@ -1,0 +1,6 @@
+@charset "UTF-8";
+/* Stylise l'état actif des liens Angular avec Tailwind via @apply */
+:host ::ng-deep .active {
+  @apply font-bold underline underline-offset-4;
+}
+/*# sourceMappingURL=header.component.css.map */
